@@ -27,9 +27,10 @@ a more recent version from the [ViennaRNA source] on github.
 Badelt et al. (in preparation)
  
 ## Version
-v0.9-dev -- standalone package
+v0.9 -- standalone package
   * extraction from the [ribolands] package to a standalone Python package.
   * using scipy and numpy for matrix exponentials (instead of [treekin])
+  * implemented lookahead to skip pruning of potentially relevant future structures
 
 ## License
 MIT

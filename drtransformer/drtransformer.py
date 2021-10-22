@@ -1,24 +1,23 @@
 #!/usr/bin/env python
 #
-# DrTransformer.py -- cotranscriptional folding.
+# DrTransformer -- cotranscriptional folding.
 #
 import logging
 import os
 import sys
 import math
-import shutil
-import tempfile
 import argparse
 import numpy as np
 from packaging import version
+
+# Debugging only
 from datetime import datetime
 
 import RNA
 from . import __version__, _MIN_VRNA_VERSION 
-from .utils import parse_vienna_stdin
+from .utils import parse_vienna_stdin, get_tkn_simulation_files
 from .landscape import TrafoLandscape
 from .pathfinder import top_down_coarse_graining
-from .treekinwrapper import get_tkn_simulation_files
 
 def restricted_float(x):
     y = float(x)
@@ -98,19 +97,7 @@ def parse_drtrafo_args(parser):
     parser.add_argument("-v", "--verbose", action = 'count', default = 0,
             help = """Track process by writing verbose output to STDOUT during
             calculations. Use --logfile if you want to see *just* verbose
-            information via STDOUT.  The verbose output can be visualized using
-            the script DrProfile.py. """)
-
-    ##############################
-    # DrTransformer dependencies #
-    ##############################
-    environ.add_argument("--treekin", default = 'treekin', action = 'store', metavar = '<str>', 
-            help = "Path to the *treekin* executable.")
-
-    environ.add_argument("--mpack-method", action = 'store',
-            choices = (['FLOAT128', 'LD', 'QD', 'DD']),
-            help = """Increase the precision of treekin simulations. Requires a development
-                    version of treekin with mpack support.""")
+            information via STDOUT.""")
 
     ########################
     # DrTransformer output #
@@ -132,9 +119,8 @@ def parse_drtrafo_args(parser):
             {--outdir}/{--name}.log""")
 
     output.add_argument("--tmpdir", default = '', action = 'store', metavar = '<str>',
-            help = """Specify path for storing temporary output files. These
-            files will not be removed when the program terminates. Defaults to
-            the default directory for temporary files on your System.""")
+            help = """Specify path for storing landscape files for debugging. These
+            files will not be removed when the program terminates. """)
 
     output.add_argument("--outdir", default = '', action = 'store', metavar = '<str>',
             help = """Place regular output files, into this directory. Creates
@@ -142,10 +128,6 @@ def parse_drtrafo_args(parser):
 
     output.add_argument("--no-timecourse", action = "store_true",
             help = """Do not produce the time-course file (outdir/name.drf).""")
-
-    output.add_argument("--t-inc", type = float, default = 1.2, metavar = '<flt>',
-            help = """Adjust the plotting time resolution via the time-increment of
-            the solver (t1 * t-inc = t2).""")
 
     output.add_argument("--plot-minh", type = float, default = None, metavar = '<flt>',
             help = """Coarsify the output based on a minimum barrier height. In contrast
@@ -156,14 +138,10 @@ def parse_drtrafo_args(parser):
             help = argparse.SUPPRESS)
 
     output.add_argument("--t-lin", type = int, default = 30, metavar = '<int>',
-            #help = """Evenly space output *t-lin* times during transcription on a linear time scale.""")
-            help = argparse.SUPPRESS)
-    output.add_argument("--t-log", type = int, default = 300, metavar = '<int>',
-            #help = """Evenly space output *t-log* times after transcription on a logarithmic time scale.""")
-            help = argparse.SUPPRESS)
+            help = """Evenly space output *--t-lin* times during transcription on a linear time scale.""")
 
-    output.add_argument("--t0", type = float, default = 0, metavar = '<flt>',
-            help = argparse.SUPPRESS)
+    output.add_argument("--t-log", type = int, default = 300, metavar = '<int>',
+            help = """Evenly space output *--t-log* times after transcription on a logarithmic time scale.""")
 
     ############################
     # Transcription parameters #
@@ -171,14 +149,18 @@ def parse_drtrafo_args(parser):
     trans.add_argument("--t-ext", type = float, default = 0.02, metavar = '<flt>',
             help = """Transcription speed, i.e. time per nucleotide extension
             [seconds per nucleotide].""")
+
     trans.add_argument("--t-end", type = float, default = 60, metavar = '<flt>',
             help = "Post-transcriptional simulation time [seconds].")
+
     trans.add_argument("--pause-sites", nargs='+', metavar='<int>=<flt>',
             help="""Transcriptional pausing sites.  E.g. \"--pause-sites 82=2e3
             84=33\" alters the simulation time at nucleotides 82 and 84 to 2000
             and 33 seconds, respectively. """)
+
     trans.add_argument("--start", type = int, default = 1, metavar = '<int>',
             help = "Start transcription at this nucleotide.")
+
     trans.add_argument("--stop", type = int, default = None, metavar = '<int>',
             help = "Stop transcription before this nucleotide")
 
@@ -200,16 +182,6 @@ def parse_drtrafo_args(parser):
     algo.add_argument("--minh", type = float, default = None, metavar = '<flt>',
             # An alternative to specify --t-fast in terms of a barrier height.
             help = argparse.SUPPRESS)
-
-    #algo.add_argument("--t-slow", type = float, default = 360000, metavar = '<flt>',
-    #        help = """Only accept new structures as neighboring conformations if
-    #        the transition is faster than --t-slow. This parameter may be
-    #        useful to prevent numeric instabilities, otherwise, better avoid
-    #        it.""")
-
-    #algo.add_argument("--maxh", type = float, default = None, metavar = '<flt>',
-    #        # An alternative to specify --t-fast in terms of a barrier height.
-    #        help = argparse.SUPPRESS)
 
     algo.add_argument("--force", action = "store_true", 
             # Enforce a setting against all warnings.
@@ -363,25 +335,11 @@ def main():
     logger.info(f'--t-fast: {args.t_fast} s => {args.minh} kcal/mol barrier height ' + 
                 f'and {1/args.t_fast} /s rate at k0 = {args.k0}')
 
-    #if args.maxh:
-    #    logger.warning('Overwriting t-slow parameter.')
-    #    args.t_slow = 1/(args.k0 * math.exp(-args.maxh/_RT))
-    #else:
-    #    args.maxh = -_RT * math.log(1 / args.t_slow / args.k0)
-    #logger.info(f'--t-slow {args.t_slow} s => {args.maxh} kcal/mol barrier height ' +
-    #            f'and {1/args.t_slow} /s rate at k0 = {args.k0}')
-
     if not args.force and args.t_fast and args.t_fast * 10 > args.t_ext:
         raise SystemExit('ERROR: Conflicting Settings: ' + 
                 'Arguments must be such that "--t-fast" * 10 > "--t-ext".\n' + 
                 '       => An instant folding time must be at least 10x shorter than ' +
                 'the time of nucleotide extension. You may use --force to ignore this setting.')
-
-    #if not args.force and args.t_slow and args.t_end * 100 > args.t_slow:
-    #    raise SystemExit('ERROR: Conflicting Settings: ' + 
-    #            'Arguments must be such that "--t-slow" < 100 * "--t-end".\n' + 
-    #            '       => A negligibly long folding time must be at least 100x longer than ' +
-    #            'the final simulation time. You may use --force to ignore this error.')
 
     if version.parse(RNA.__version__) < version.parse(_MIN_VRNA_VERSION):
         raise VersionError('ViennaRNA', RNA.__version__, _MIN_VRNA_VERSION)
@@ -404,8 +362,6 @@ def main():
     vrna_md.special_hp = not args.noTetra
     vrna_md.noGU = args.noGU
     vrna_md.noGUclosure = args.noClosingGU
-    #vrna_md.gquad = 0 G-Quads cannot be turned on.
-
 
     # Write logging output
     if args.stdout == 'log' or lfh:
@@ -422,7 +378,6 @@ def main():
         fdata += "# Algorithm parameters:\n"
         fdata += "# --o-prune: {}\n".format(args.o_prune)
         fdata += "# --t-fast: {} sec\n".format(args.t_fast)
-        #fdata += "# --t-slow: {} sec\n".format(args.t_slow)
         #fdata += "# --findpath-search-width: {}\n".format(args.findpath_search_width)
         fdata += "# --min-fraying: {} nuc\n".format(args.min_fraying)
         fdata += "# --k0: {}\n".format(args.k0)
@@ -452,7 +407,6 @@ def main():
     TL = TrafoLandscape(fullseq, vrna_md)
     TL.k0 = args.k0
     TL.minh = int(round(args.minh*100)) if args.minh else 0
-    #TL.maxh = int(round(args.maxh*100)) if args.maxh else 0
     TL._transcript_length = args.start - 1
 
     psites = np.full(args.stop - args.start + 1, args.t_ext, dtype = float)
@@ -487,10 +441,8 @@ def main():
                     f' (Simulation network size: nodes = {cn}, edges = {ce}.)')
         ctime = datetime.now()
 
-        # Adjust simulation output times.
-        t0 = args.t0
         # Adjust the lenght of the lin-time simulation:
-        t1 = psites[tlen]
+        t0, t1 = 0, psites[tlen]
         # Adjust the lenght of the log-time simulation:
         t8 = t1 + args.t_end if tlen == args.stop - 1 else t1 + sum(psites[tlen+1:])
 
@@ -588,7 +540,7 @@ def main():
             delth = 10 # delete structures if inactive for more than 10 rounds.
             pn, dn = TL.prune(args.o_prune, delth, keep) 
             logger.info(f'After pruning:         {len(list(TL.active_local_mins)):3d} active lmins, {len(list(TL.active_nodes)):3d} active structures, {len(list(TL.inactive_nodes)):3d} inactive structures.' +
-                        f' (Pruned {len(pn)} nodes with combined occupancy below {args.o_prune:.2f}, deleted {len(dn)} nodes inactive for {delth} transcription steps.)')
+                    f' (Pruned {len(pn)} nodes with combined occupancy below {args.o_prune:.2f}, kept {len(keep)} nodes due to lookahead, deleted {len(dn)} nodes inactive for {delth} transcription steps.)')
 
         ptime = datetime.now()
         if args.verbose:
