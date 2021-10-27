@@ -33,12 +33,13 @@ v0.9 -- standalone package
   * implemented lookahead to skip pruning of potentially relevant future structures
 
 ## License
-MIT
+Same as the [ViennaRNA license]. 
 
 [//]: References
 [ViennaRNA]: <http://www.tbi.univie.ac.at/RNA>
 [ViennaRNA source]: <https://github.com/ViennaRNA/ViennaRNA>
 [ViennaRNA bioconda]: <https://anaconda.org/bioconda/viennarna>
+[ViennaRNA license]: <https://github.com/ViennaRNA/ViennaRNA/blob/master/license.txt>
 [ribolands]: <https://github.com/bad-ants-fleet/ribolands>
 [treekin]: <https://github.com/ViennaRNA/Treekin>
 
