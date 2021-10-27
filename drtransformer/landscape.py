@@ -5,7 +5,7 @@
 #
 
 import logging
-rlog = logging.getLogger(__name__)
+drlog = logging.getLogger(__name__)
 
 import math
 import numpy as np
@@ -19,7 +19,7 @@ from .utils import make_pair_table
 from .pathfinder import (get_guide_graph, 
                          neighborhood_flooding,
                          top_down_coarse_graining)
-from .linalg import get_p8_detbal, symmetrize, decompose_sym, mxprint
+from .linalg import get_p8_detbal, mx_symmetrize, mx_decompose_sym, mx_print
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 # Custom error definitions                                                     #
@@ -581,17 +581,17 @@ class TrafoLandscape:
                     R[i][j] = self.cg_edges[(ni, nj)]['weight']
         np.fill_diagonal(R, -np.einsum('ji->j', R))
 
-        rlog.debug("Initial occupancy vector:\n" + mxprint([p0]))
-        rlog.debug("Input matrix A including diagonal elements:\n" + mxprint(R))
+        drlog.debug("Initial occupancy vector:\n" + mx_print([p0]))
+        drlog.debug("Input matrix A including diagonal elements:\n" + mx_print(R))
 
         last = -1
         try:
             p8 = get_p8_detbal(R)
             assert all(p > 0 for p in p8), "Negative elements in p8"
-            rlog.debug("Equilibrium distribution vector p8:\n" + mxprint([p8]))
+            drlog.debug("Equilibrium distribution vector p8:\n" + mx_print([p8]))
 
-            _P, U, P_= symmetrize(R.T, p8)
-            _S, L, S_ = decompose_sym(U)
+            U, _P, P_= mx_symmetrize(R.T, p8)
+            _S, L, S_ = mx_decompose_sym(U)
             CL = np.matmul(P_, _S)
             CR = np.matmul(S_, _P)
             assert np.allclose(np.matmul(CL, CR), np.identity(dim), atol = 1e-5, rtol = 1e-5), "CL * CR != I"
@@ -606,11 +606,11 @@ class TrafoLandscape:
                 yield t, np.absolute(pt/sum(np.absolute(pt)))
                 last = t
                 if np.allclose(pt, p8):
-                    rlog.debug(f'# Equilibrium reached at time {t=}.')
+                    drlog.debug(f'# Equilibrium reached at time {t=}.')
                     yield times[-1], p8
                     return
         except AssertionError as err:
-            rlog.debug(f"Exception due to Error: {str(err)}")
+            drlog.debug(f"Exception due to Error: {str(err)}")
             R = R.T
             for t in times:
                 if t <= last:
@@ -677,7 +677,7 @@ class TrafoLandscape:
                 if self.nodes[node]['pruned'] == 1:
                     # this includes hidden nodes that were not part of the simulation
                     pn.add(node)
-            rlog.debug(f'After pruning: {node} {self.nodes[node]}')
+            drlog.debug(f'After pruning: {node} {self.nodes[node]}')
             if self.nodes[node]['pruned'] > delth:
                 #TODO: probably quite inefficient...
                 for (x, y) in set(self.edges):

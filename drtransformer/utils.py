@@ -5,7 +5,8 @@
 #
 
 import logging
-rlog = logging.getLogger(__name__)
+drlog = logging.getLogger(__name__)
+
 import re
 from struct import pack
 

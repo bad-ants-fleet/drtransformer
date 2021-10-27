@@ -15,7 +15,7 @@ setup(
     maintainer = 'Stefan Badelt',
     maintainer_email = 'bad-ants-fleet@posteo.eu',
     url = 'https://github.com/bad-ants-fleet/drtransformer',
-    license = 'MIT',
+    license = 'ViennaRNA',
     classifiers = [
         'Development Status :: 3 - Alpha',
         'Programming Language :: Python :: 3.8',
@@ -31,7 +31,8 @@ setup(
     entry_points = {
         'console_scripts': [
             'DrTransformer=drtransformer.drtransformer:main',
-            'DrPlotter=drtransformer.plotting:main'
+            'DrPlotter=drtransformer.plotting:main',
+            'DrSimlate=drtransformer.linalg:main',
             ],
         }
 )

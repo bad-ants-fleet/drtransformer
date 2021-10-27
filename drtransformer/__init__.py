@@ -1,5 +1,5 @@
 #
-# drtransformer
+# drtransformer package
 #
 
 __version__ = "0.9"

@@ -2,23 +2,33 @@
 # drtransformer.linalg
 # 
 # Calculate matrix exponentials using numpy.
+# Most of this code is inpired by the program treekin:
+#  https://www.tbi.univie.ac.at/RNA/Treekin/ 
 #
-import logging
 
-import argparse
+import logging
+drlog = logging.getLogger(__name__)
+
 import numpy as np
 import scipy
 import scipy.linalg as sl
+from itertools import combinations
 
 def get_p8_detbal(A):
-    """ Calculate the equilibrium distribution vector p8.
+    """ Calculate the equilibrium distribution vector "p8".
 
-    Given a the rate matrix A, calculate the equilibrium distribution using
-    detailed balance. 
+    Given a the rate matrix A, calculate the equilibrium distribution vector
+    "p8" using detailed balance: P_i k_{ij} = P_j k_{ji}.
+
+    Args:
+        A: A numpy matrix with entries A[i][j] containing the rate constant for
+            reaction i->j. 
+
     WARNING: This function requires a matrix with ZERO entries. Do not use it
     with numerical result matrices where some A[i][j] may be "almost" zero.
 
-    A matrix entry A[i][j] must be the rate i->j. 
+    Returns:
+        [np.array] The equilbrium distribution vector p8.
     """
     dim = len(A)
     p8 = np.zeros(dim, dtype=np.float64)
@@ -32,14 +42,14 @@ def get_p8_detbal(A):
             if i == j:
                 continue
             if A[i][j] != 0 or A[j][i] != 0:
-                assert A[i][j] > 0 and A[j][i] > 0
+                assert A[i][j] > 0 and A[j][i] > 0, "unbalanced matrix"
                 if p8[j] > 0:
                     p8[j] += p8[i] * (A[i][j] / A[j][i])
                     p8[j] /= 2
                 else:
                     p8[j] = p8[i] * (A[i][j] / A[j][i])
                     count += 1
-                assert 0 <= p8[j] <= p8[0] # or np.isclose(p8[j], 0) or np.isclose(p8[j], 1)
+                assert 0 <= p8[j] <= p8[0], "unreasonable equilibrium occupancy in p8"
         # Given i, we have looped through all j
         done[i] = 1
         # Determine next i for solving
@@ -50,59 +60,82 @@ def get_p8_detbal(A):
         assert not (i == dim and count < dim), "non-ergodic chain!"
     return p8 / sum(p8) # make the vector sum = 1.0
 
-def symmetrize(A, p8):
-    """
-    Takes the transposed matrix: rates i <- j
+def mx_symmetrize(A, p8):
+    """ Symmetrize a rate matrix by using its equilibrium distribution.
 
-    U = _sqrPI * A * sprPI_
+    Generating a symmetric matrix U throught the following formula:
+        U = _sqrtP8 * A * sqrtP8_ 
+    where _sqrtP8 and sqrtP8 are diagonal matrices constructed from the 
+    equilibrium distribution vector.
+
+    Args:
+        A (np.array): A numpy matrix with entries A[i][j] containing the rate
+            constant for reaction j<-i. (Note that this is the transpose of the
+            "original" rate matrix.)
+        p8 (np.array): The equilibrium distribution vector.
+
+    Returns:
+        U, _sqrP8, sqrP8_
     """
     dim = len(A)
-    _sqrP8 = np.diag(1/np.sqrt(p8))
-    sqrP8_ = np.diag(np.sqrt(p8))
-    U = np.matmul(np.matmul(_sqrP8, A), sqrP8_)
+    _sqrtP8 = np.diag(1/np.sqrt(p8))
+    sqrtP8_ = np.diag(np.sqrt(p8))
+    U = np.matmul(np.matmul(_sqrtP8, A), sqrtP8_)
 
-    # correct for numerical errors
+    # force correction of numerical errors
     err = 0
-    for (i, j) in zip(*np.triu_indices(dim)):
-        if i == j:
-            continue
+    for (i, j) in combinations(range(dim), 2):
         err += abs((U[i][j] + U[j][i]) / 2 - U[i][j])
         U[i][j] = (U[i][j] + U[j][i]) / 2
         U[j][i] = U[i][j]
+    drlog.debug(f'Corrected numerical error: {err} ({err/(dim*dim-dim)} per number).')
+    return U, _sqrtP8, sqrtP8_
 
-    #print(f'Corrected numerical error: {err} ({err/(dim*dim-dim)} per number)')
-    return _sqrP8, U, sqrP8_
+def mx_decompose_sym(U):
+    """ Decompose a symmetric matrix into eigenvectors and eigenvalues.
 
-def decompose_sym(U):
+    Note, we use scipy.linalg.eigh here instead of numpy.linalg.eig because the
+    former is much more robust for symmetric matrices. It also should be
+    faster, but I have not verified that.
+
+    Args:
+        U (np.array): A numpy matrix with entries U[i][j] containing the
+            symmetric flux of reactions i->j and j<-i. 
+
+    Returns:
+        evecs, evals, evecs.T: A sorted matrix of eigenvectors, and the
+            corresponing vector of eigenvalues.  
+    """
     # Check if matrix has issues
-    #evals, evecs = np.linalg.eig(U)
     evals, evecs = sl.eigh(U)
 
     # Sort them by largest eigenvalue
     idx = evals.argsort()[::-1]
     evals = evals[idx]
     evecs = evecs[:,idx]
-
     return evecs, evals, evecs.T # eves.T == np.linalg.inv(evecs) due to symmetry
 
-def mxprint(A):
+def mx_print(A):
+    """ A helper function to pretty print matrices.
+    """
     return '\n'.join(' '.join([f'{x:10.4f}' for x in row]) for row in A)
-
 
 def main():
     """ A python implementation of (some parts of) the treekin program.
 
     https://www.tbi.univie.ac.at/RNA/Treekin/
     """
+    import sys
+    import argparse
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         description='%(prog)s [options] filename')
 
     parser.add_argument("-v", "--verbose", action='count', default=0,
-            help="""Track process by writing verbose output to STDOUT during calculations.""")
+            help = """Track process using verbose output.""")
 
-    parser.add_argument('input_filename', default=None, nargs='?', metavar='<str>', 
-            help="Path to the input file.")
+    parser.add_argument("-r", "--rate-matrix", default=None, nargs='?', metavar='<str>', 
+            help = "Path to the input file containing the rate matrix (A[i][j] = i -> j).")
 
     parser.add_argument("--p0", nargs='+', metavar='<int/str>=<flt>', required=True,
             help="""Vector of initial species concentrations. 
@@ -110,19 +143,19 @@ def main():
             and 3rd species at a concentration of 0.7. You may chose to address species
             directly by name, e.g.: --p0 C=0.5.""")
  
-    parser.add_argument("--t-lin", type = int, default = None, metavar = '<int>',
+    parser.add_argument("--t-lin", type = int, default = 10, metavar = '<int>',
             help = """Evenly space output *t-lin* times [t0, t1] at start of simulation.""")
 
-    parser.add_argument("--t-log", type = int, default = None, metavar = '<int>',
+    parser.add_argument("--t-log", type = int, default = 10, metavar = '<int>',
             help = """Evenly space output *t-log* times (t1, t8] at end of simulation.""")
 
     parser.add_argument("--t0", type = float, default = 0, metavar = '<flt>',
             help = """Give t0.""")
 
-    parser.add_argument("--t1", type = float, default = None, metavar = '<flt>',
+    parser.add_argument("--t1", type = float, default = 0.1, metavar = '<flt>',
             help = """Give t1.""")
 
-    parser.add_argument("--t8", type = float, default = 10, metavar = '<flt>',
+    parser.add_argument("--t8", type = float, default = 1e5, metavar = '<flt>',
             help = """Give t8.""")
 
     args = parser.parse_args()
@@ -162,7 +195,7 @@ def main():
         log_times = []
 
     # Parse matrix input.
-    A = np.loadtxt(args.input_filename, dtype=np.float64)
+    A = np.loadtxt(args.rate_matrix, dtype=np.float64)
     np.fill_diagonal(A, -np.einsum('ji->j', A))
     dim = len(A)
 
@@ -178,51 +211,53 @@ def main():
     #
     # Start the linalg stuff.
     #
-    logger.info(f"Initial occupancy vector ({sum(p0)=}):\n{mxprint([p0])}")
-    logger.info(f"Input matrix A including diagonal elements:\n{mxprint(A)}")
+    logger.info(f"Initial occupancy vector ({sum(p0)=}):\n{mx_print([p0])}")
+    logger.info(f"Input matrix A including diagonal elements:\n{mx_print(A)}")
 
     # Get equilibrium distribution.
     p8 = get_p8_detbal(A)
-    logger.info(f"Equilibrium distribution vector p8 ({sum(p8)=}):\n{mxprint([p8])}")
+    logger.info(f"Equilibrium distribution vector p8 ({sum(p8)=}):\n{mx_print([p8])}")
 
     logger.info(f"\nSolving: U = _P8 * A^T * P8_\n")
-    _P, U, P_= symmetrize(A.T, p8)
-    logger.info("Symmetrized matrix U:\n" + mxprint(U))
-    logger.info("1 / sqrt(P8) matrix:\n" + mxprint(_P))
-    logger.info("sqrt(P8):\n" + mxprint(P_))
+    U, _P, P_= mx_symmetrize(A.T, p8)
+    logger.info("Symmetrized matrix U:\n" + mx_print(U))
+    logger.info("1 / sqrt(P8) matrix:\n" + mx_print(_P))
+    logger.info("sqrt(P8):\n" + mx_print(P_))
     pU8 = get_p8_detbal(U)
-    logger.info(f"Equilibrium distribution vector pU8 ({sum(pU8)=}):\n{mxprint([pU8])}")
+    logger.info(f"Equilibrium distribution vector pU8 ({sum(pU8)=}):\n{mx_print([pU8])}")
 
     logger.info(f"\nDecomposing: U = _S * L * S_\n")
-    _S, L, S_ = decompose_sym(U)
-    logger.info("Eigenvalues L:\n" + mxprint([L]))
-    logger.info("Eigenvectors _S:\n" + mxprint(_S))
-    logger.info("Eigenvectors S_:\n" + mxprint(S_)) # It's just the transpose of _S!
+    _S, L, S_ = mx_decompose_sym(U)
+    logger.info("Eigenvalues L:\n" + mx_print([L]))
+    logger.info("Eigenvectors _S:\n" + mx_print(_S))
+    logger.info("Eigenvectors S_:\n" + mx_print(S_)) # It's just the transpose of _S!
     
     CL = np.matmul(P_, _S)
-    logger.info("Left correction matrix CL:\n" + mxprint(CL))
+    logger.info("Left correction matrix CL:\n" + mx_print(CL))
     CR = np.matmul(S_, _P)
-    logger.info("Right correction matrix CR:\n" + mxprint(CR))
+    logger.info("Right correction matrix CR:\n" + mx_print(CR))
 
-    logger.info("CL * CR:\n" + mxprint(np.matmul(CL, CR)))
+    logger.info("CL * CR:\n" + mx_print(np.matmul(CL, CR)))
     assert np.allclose(np.matmul(CL, CR), np.identity(dim), atol = 1e-4, rtol = 1e-4)
 
     tV = CR.dot(p0)
-    logger.info(f"Correction vector tV ({sum(tV)=}):\n{mxprint([tV])}")
+    logger.info(f"Correction vector tV ({sum(tV)=}):\n{mx_print([tV])}")
     assert np.allclose(tV, S_.dot(_P.dot(p0)))
     assert isinstance(tV[0], np.float64)
 
+    times = np.concatenate([lin_times, log_times])
     # Simulation of decomposed matrix.
-    for t in np.concatenate([lin_times, log_times]):
+    for t in times:
         eLt = np.diag(np.exp(L*t))
         pt = CL.dot(eLt.dot(tV))
         pt = CL.dot(np.multiply(np.exp(L*t), tV))
-        print(f"{t:22.20e} {' '.join([f'{x:8.6e}' for x in pt])}")
+        print(f"{t:8.6e} {' '.join([f'{x:8.6e}' for x in abs(pt)])}")
         if np.allclose(pt, p8, rtol = 1e-4, atol = 1e-4):
-            print(f'# Reached equilibrium at time {t=}.')
-            #break
+            logger.info(f'# Reached equilibrium at time {t=}.')
+            print(f"{times[-1]:8.6e} {' '.join([f'{x:8.6e}' for x in p8])}")
+            break
         if not np.isclose(sum(pt), 1., atol = 1e-4):
-            print(f'# Unstable simulation at time {t=}: {sum(pt)=}')
+            logger.error(f'# Unstable simulation at time {t=}: {sum(pt)=}')
             break
 
 if __name__ == '__main__':
