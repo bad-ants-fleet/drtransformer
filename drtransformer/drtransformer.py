@@ -6,13 +6,12 @@ import logging
 import os, sys, argparse
 import math
 import numpy as np
-from packaging import version
 
 # Debugging only
 from datetime import datetime
 
 import RNA
-from . import __version__, _MIN_VRNA_VERSION 
+from . import __version__
 from .landscape import TrafoLandscape
 from .rnafolding import top_down_coarse_graining, parse_model_details
 from .utils import parse_vienna_stdin, get_tkn_simulation_files
@@ -20,42 +19,8 @@ from .utils import parse_vienna_stdin, get_tkn_simulation_files
 def restricted_float(x):
     y = float(x)
     if y < 0.0 or y > 1.0:
-        raise argparse.ArgumentTypeError(f"{x} not in range (0.0, 1.0)")
+        raise argparse.ArgumentTypeError(f"{x} not in range [0.0, 1.0]")
     return y
-
-def sorted_trajectories(nlist, tfile, plot_cgm = None, mapping = None):
-    """ Yields the time course information using a treekin output file.
-
-    Args:
-      nlist (list): a list of nodes sorted by their energy
-      tfile (str): treekin-output file name.
-      softmap (dict, optional): A mapping to transfer occupancy between
-        states. Likely not the most efficient implementation.
-
-    Yields:
-      list: ID, time, occupancy, structure, energy
-    """
-    with open(tfile) as tkn:
-        for line in tkn:
-            if line[0] == '#':
-                continue
-            course = list(map(float, line.strip().split()))
-            time = course[0]
-            if plot_cgm:
-                # Combine all results that belong together.
-                for e, occu in enumerate(course[1:]):
-                    if nlist[e] not in plot_cgm:
-                        continue
-                    node = nlist[e]
-                    for n in plot_cgm[node]:
-                        ci = nlist.index(n) + 1
-                        occu += course[ci]/len(mapping[n])
-                    yield time, nlist[e], occu 
-            else:
-                for e, occu in enumerate(course[1:]):
-                    # is it above visibility threshold?
-                    yield time, nlist[e], occu 
-    return
 
 def parse_drtrafo_args(parser):
     """ A collection of arguments that are used by DrTransformer """
@@ -86,7 +51,7 @@ def parse_drtrafo_args(parser):
             choices = ('log', 'drf', 'OFF'),
             help = """Choose STDOUT formats to follow the cotranscriptional
             folding progress in real time: *log*: a human readable output
-            format.  *drf*: DrForna visalization input format. *OFF*: actively
+            format.  *drf*: DrForna visualization input format. *OFF*: actively
             suppress output. The default (None) switches between *OFF*, if --logfile is
             specified, or *log* otherwise.""")
 
@@ -108,10 +73,6 @@ def parse_drtrafo_args(parser):
     output.add_argument("--plot-minh", type = float, default = None, metavar = '<flt>',
             help = """Coarsify the output based on a minimum barrier height. In contrast
             to t-fast, this does *not* speed up the simulation.""")
-
-    output.add_argument("--draw-graphs", action = "store_true",
-            #help = """Export every landscape as json file. Uses --tempdir. """)
-            help = argparse.SUPPRESS)
 
     output.add_argument("--t-lin", type = int, default = 30, metavar = '<int>',
             help = """Evenly space output *--t-lin* times during transcription on a linear time scale.""")
@@ -146,13 +107,13 @@ def parse_drtrafo_args(parser):
     algo.add_argument("--o-prune", type = restricted_float, default = 0.1, metavar = '<flt>',
             help = """Occupancy threshold to prune structures from the 
             network. The structures with lowest occupancy are removed until
-            at most o-prune occupancy has beem removed from the total population. """)
+            at most o-prune occupancy has been removed from the total population. """)
 
     algo.add_argument("--t-fast", type = float, default = 0.001, metavar = '<flt>',
             help = """Folding times faster than --t-fast are considered
             instantaneous.  Structural transitions that are faster than
-            --t-fast are considerd part of the same macrostate. Directly
-            translates to an energy barrier separating conforations using:
+            --t-fast are considered part of the same macrostate. Directly
+            translates to an energy barrier separating conformations using:
             dG = -RT*ln((1/t-fast)/k0). None: t-fast = 1/k_0 """)
 
     algo.add_argument("--minh", type = float, default = None, metavar = '<flt>',
@@ -163,11 +124,12 @@ def parse_drtrafo_args(parser):
             # Enforce a setting against all warnings.
             help = argparse.SUPPRESS)
 
-    # NOTE: findpath width is flexible by default, easy to implement though.
-    #algo.add_argument("--findpath-search-width", type = int, default = 0, metavar = '<int>',
-    #        help = """Search width for the *findpath* heuristic. Higher values
-    #        increase the chances to find energetically better transition state
-    #        energies.""")
+    # TODO: findpath width is flexible by default, easy to implement though.
+    #algo.add_argument("--fpwm", type = int, default = 4, metavar = '<int>',
+    #        help = """Findpath search width multiplier. This value times the
+    #        base-pair distance results in the findpath search width. Higher
+    #        values increase the chances to find energetically better transition
+    #        state energies.""")
 
     algo.add_argument("--min-fraying", type = int, default = 6, metavar = '<int>',
             help = """Minimum number of freed bases during helix fraying.
@@ -229,16 +191,17 @@ def main():
 
     (name, fullseq) = parse_vienna_stdin(sys.stdin, chars='ACGUNacgun')
 
+    # Adjust arguments, prepare simulation
     if args.plot_minh:
         args.plot_minh = int(round(args.plot_minh*100))
-    # Adjust arguments, prepare simulation
+
     if args.name == '':
         args.name = name
     else:
         name = args.name
 
     if os.path.split(args.name)[0]:
-        raise SystemExit('ERROR: Argument "--name" must not contain filepath.')
+        raise SystemExit('ERROR: Argument "--name" must not contain file path.')
 
     if args.outdir:
         if not os.path.exists(args.outdir):
@@ -250,7 +213,7 @@ def main():
     dfh = open(filepath + '.drf', 'w') if not args.no_timecourse else None
     lfh = open(filepath + '.log', 'w') if args.logfile else None
 
-    # Adjust filehandle-stuff
+    # Adjust file handle
     if args.stdout is None and lfh is None:
         args.stdout = 'log'
 
@@ -293,7 +256,7 @@ def main():
     # (2) The rate of an effectively 0 folding
     # event (< k-slow) has to be much slower than
     # the rate of chain elongation (kx), it
-    # should also be much slower than the
+    # should also be much slower than one over the
     # post-transcriptional simulation time --t-end
     #
     # Parameters:
@@ -316,9 +279,6 @@ def main():
                 'Arguments must be such that "--t-fast" * 10 > "--t-ext".\n' + 
                 '       => An instant folding time must be at least 10x shorter than ' +
                 'the time of nucleotide extension. You may use --force to ignore this setting.')
-
-    if version.parse(RNA.__version__) < version.parse(_MIN_VRNA_VERSION):
-        raise VersionError('ViennaRNA', RNA.__version__, _MIN_VRNA_VERSION)
 
     ############################
     # ~~~~~~~~~~~~~~~~~~~~~~~~ #
@@ -368,7 +328,7 @@ def main():
         fdata += "#\n"
         fdata += "#\n"
         fdata += "# Results:\n"
-        fdata += "# Tanscription Step | Energy-sorted structure count | Structure | Energy "
+        fdata += "# Transcription Step | Energy-sorted structure count | Structure | Energy "
         fdata += "| [Occupancy-t0 Occupancy-t8] | Structure ID (-> Plotting ID)\n"
         write_output(fdata, stdout=(args.stdout == 'log'), fh = lfh)
 
@@ -376,10 +336,10 @@ def main():
     if args.stdout == 'drf' or dfh:
         # Dictionary to store time course data.
         all_courses = dict()
-        fdata = "id time conc struct energy\n"
+        fdata = "id time occupancy structure energy\n"
         write_output(fdata, stdout = (args.stdout == 'drf'), fh = dfh)
 
-    # initialize a directed conformation graph
+    # Initialize a directed conformation graph
     TL = TrafoLandscape(fullseq, vrna_md)
     TL.k0 = args.k0
     TL.minh = int(round(args.minh*100)) if args.minh else 0
@@ -391,14 +351,16 @@ def main():
             site, pause = term.split('=')
             psites[int(site)] = float(pause)
     tr_end = sum(psites)
-    #import statprof
-    #statprof.start()
 
     #############
     # ~~~~~~~~~ #
     # Main loop #
     # ~~~~~~~~~ #
     #############
+
+    #import statprof
+    #statprof.start()
+
     for tlen in range(args.start, args.stop):
         time = TL.total_time
 
@@ -417,9 +379,9 @@ def main():
                     f' (Simulation network size: nodes = {cn}, edges = {ce}.)')
         ctime = datetime.now()
 
-        # Adjust the lenght of the lin-time simulation:
+        # Adjust the length of the lin-time simulation:
         t0, t1 = 0, psites[tlen]
-        # Adjust the lenght of the log-time simulation:
+        # Adjust the length of the log-time simulation:
         t8 = t1 + args.t_end if tlen == args.stop - 1 else t1 + sum(psites[tlen+1:])
 
         if np.isclose(t0, t1) or np.isclose(t1, t8): # only lin or log-part!
@@ -464,7 +426,7 @@ def main():
         for (t, pt) in TL.simulate(snodes, p0, times):
             if tlen < args.stop - 1 and t > t1:
                 # NOTE: this is extra time to determine whether structures will
-                # become important in the timeframe of transcription.
+                # become important in the time frame of transcription.
                 pf = np.maximum(pf, pt)
                 continue
             if args.stdout == 'drf' or dfh:
@@ -529,12 +491,9 @@ def main():
             #print(tlen, tottime, exptime, cgntime, simtime, prntime)
             #sys.stdout.flush()
 
-        if args.draw_graphs:
-            raise NotImplementedError('Cannot draw graphs right now.')
-            TL.graph_to_json(_fname)
-
     # Write the last results
     if args.stdout == 'log' or lfh:
+        pe = TL.get_equilibrium_occupancies(snodes)
         fdata  = "# Distribution of structures at the end:\n"
         fdata += "#         {}\n".format(TL.transcript)
         if args.plot_minh:
@@ -543,18 +502,20 @@ def main():
                     continue
                 ne = TL.nodes[node]['energy']/100
                 no = p8[e] + sum(p8[snodes.index(n)]/len(mapping[n]) for n in plot_cgm[node])
+                eo = pe[e] + sum(pe[snodes.index(n)]/len(mapping[n]) for n in plot_cgm[node])
                 ni = TL.nodes[node]['identity']
                 nids = [TL.nodes[n]['identity'] for n in sorted(plot_cgm[node], key = lambda x: TL.nodes[x]['identity'])]
                 if nids:
                     ni +=  f" + {' + '.join(nids)}"
-                fdata += f"{tlen:4d} {e+1:4d} {node[:tlen]} {ne:6.2f} {no:6.4f} ID = {ni}\n"
+                fdata += f"{tlen:4d} {e+1:4d} {node[:tlen]} {ne:6.2f} {no:6.4f} (eq: {eo:6.4f}) ID = {ni}\n"
             write_output(fdata, stdout = (args.stdout == 'log'), fh = lfh)
         else:
             for e, node in enumerate(sorted(TL.active_local_mins, key = lambda x: TL.nodes[x]['energy'])):
                 ne = TL.nodes[node]['energy']/100
                 no = p8[e]
+                eo = pe[e]
                 ni = TL.nodes[node]['identity']
-                fdata += f"{tlen:4d} {e:4d} {node[:tlen]} {ne:6.2f} {no:6.4f} ID = {ni}\n"
+                fdata += f"{tlen:4d} {e:4d} {node[:tlen]} {ne:6.2f} {no:6.4f} [-\u221e-> {eo:6.4f}] ID = {ni}\n"
             write_output(fdata, stdout=(args.stdout == 'log'), fh = lfh)
 
     #statprof.stop()

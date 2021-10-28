@@ -17,7 +17,7 @@ from .rnafolding import (get_guide_graph,
                          neighborhood_flooding,
                          find_fraying_neighbors,
                          top_down_coarse_graining)
-from .linalg import mx_simulate
+from .linalg import mx_simulate, get_p8_detbal
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 # Transformer Landscape Object                                                 #
@@ -31,7 +31,7 @@ class TrafoLandscape:
     Suggested attributes for nodes: structure, identity, energy, occupancy, active
     Suggested attributes for edges: weight
     """
-    def __init__(self, sequence, vrna_md, prefix = 'n'):
+    def __init__(self, sequence, vrna_md, prefix = ''):
         self.sequence = sequence
         self.md = vrna_md
         self.fc = RNA.fold_compound(sequence, vrna_md)
@@ -271,7 +271,6 @@ class TrafoLandscape:
                                                              v['saddle_energy'] is not None}
 
             ndata, edata = neighborhood_flooding((fseq, md), ndata, gedges, tedges = edata, minh = self.minh)
-            #ndata, edata = neighborhood_flooding(self.fp, ndata, gedges, tedges = edata, minh = self.minh)
 
             # 3) Extract new node data.
             for node in ndata:
@@ -359,6 +358,15 @@ class TrafoLandscape:
         assert np.isclose(sum(p0), 1)
         return snodes, p0
         
+    def get_equilibrium_occupancies(self, snodes):
+        dim = len(snodes)
+        R = np.zeros((dim, dim))
+        for i, ni in enumerate(snodes):
+            for j, nj in enumerate(snodes):
+                if self.has_cg_edge(ni, nj):
+                    R[i][j] = self.cg_edges[(ni, nj)]['weight']
+        return get_p8_detbal(R)
+ 
     def set_occupancies(self, snodes, pt):
         for i, n in enumerate(snodes):
             self.nodes[n]['occupancy'] = pt[i]

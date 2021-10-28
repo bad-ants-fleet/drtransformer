@@ -216,10 +216,9 @@ def main():
             help = "Path to the input file containing the rate matrix (A[i][j] = i -> j).")
 
     parser.add_argument("--p0", nargs='+', metavar='<int/str>=<flt>', required=True,
-            help="""Vector of initial species concentrations. 
-            E.g. \"--p0 1=0.5 3=0.7\" stands for 1st species at a concentration of 0.5 
-            and 3rd species at a concentration of 0.7. You may chose to address species
-            directly by name, e.g.: --p0 C=0.5.""")
+            help="""Vector of initial species occupancies. 
+            E.g. \"--p0 1=0.3 3=0.7\" stands for 1st species at occupancy 0.3
+            and the 3rd species at occupancy 0.7. Occupancies should sum to 1.""")
  
     parser.add_argument("--t-lin", type = int, default = 10, metavar = '<int>',
             help = """Evenly space output *t-lin* times [t0, t1] at start of simulation.""")

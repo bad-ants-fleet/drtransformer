@@ -1007,7 +1007,7 @@ def top_down_coarse_graining_exe():
     """ A wrapper for ViennaRNA findpath functions. """
     parser = argparse.ArgumentParser()
     parser.add_argument("-v", "--verbose", action='count', default = 0,
-            help = "Verbose output, e.g. the folding pathway. (-vv increases verbosity.)")
+            help = """Track process using verbose output.""")
     parser.add_argument("--minh", type = int, default = None,
             metavar = '<int>',
             help = "Set a minimum barrier height for path flooding.")
