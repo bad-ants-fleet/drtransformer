@@ -32,6 +32,8 @@ setup(
         'console_scripts': [
             'DrTransformer=drtransformer.drtransformer:main',
             'DrPlotter=drtransformer.plotting:main',
+            'DrFindpath=drtransformer.rnafolding:call_findpath_exe',
+            'DrCoarseGrain=drtransformer.rnafolding:top_down_coarse_graining_exe',
             'DrSimlate=drtransformer.linalg:main',
             ],
         }

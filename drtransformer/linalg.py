@@ -1,7 +1,8 @@
+#!/usr/bin/env python
 #
 # drtransformer.linalg
 # 
-# Calculate matrix exponentials using numpy.
+# Calculate matrix exponentials using numpy and scipy.
 # Most of this code is inpired by the program treekin:
 #  https://www.tbi.univie.ac.at/RNA/Treekin/ 
 #
@@ -13,6 +14,9 @@ import numpy as np
 import scipy
 import scipy.linalg as sl
 from itertools import combinations
+
+class MxLinalgError(Exception):
+    pass
 
 def get_p8_detbal(A):
     """ Calculate the equilibrium distribution vector "p8".
@@ -120,6 +124,80 @@ def mx_print(A):
     """
     return '\n'.join(' '.join([f'{x:10.4f}' for x in row]) for row in A)
 
+def mx_simulate(A, p0, times, atol = 1e-8, rtol = 1e-12):
+    """ Wrapper function to simulate using matrix exponentials.
+
+    Yields:
+        t, pt: The time and the population vector.
+    """
+    dim = len(A)
+
+    drlog.debug(f"Initial occupancy vector ({sum(p0)=}):\n{mx_print([p0])}")
+    np.fill_diagonal(A, -np.einsum('ji->j', A))
+    drlog.debug(f"Input matrix A including diagonal elements:\n{mx_print(A)}")
+
+    last = -1
+    try:
+        p8 = get_p8_detbal(A)
+        drlog.info(f"Equilibrium distribution vector p8 ({sum(p8)=}):\n{mx_print([p8])}")
+        if not all(p > 0 for p in p8): 
+            raise MxLinalgError(f"Negative elements in p8 ({p8=})")
+
+        drlog.debug(f"\nSolving: U = _P8 * A^T * P8_\n")
+        U, _P, P_= mx_symmetrize(A.T, p8)
+        drlog.debug("Symmetrized matrix U:\n" + mx_print(U))
+        drlog.debug("1 / sqrt(P8) matrix:\n" + mx_print(_P))
+        drlog.debug("sqrt(P8):\n" + mx_print(P_))
+
+        drlog.debug(f"\nDecomposing: U = _S * L * S_\n")
+        _S, L, S_ = mx_decompose_sym(U)
+        drlog.debug("Eigenvalues L:\n" + mx_print([L]))
+        drlog.debug("Eigenvectors _S:\n" + mx_print(_S))
+        drlog.debug("Eigenvectors S_:\n" + mx_print(S_)) # It's just the transpose of _S!
+ 
+        CL = np.matmul(P_, _S)
+        drlog.debug("Left correction matrix CL:\n" + mx_print(CL))
+
+        CR = np.matmul(S_, _P)
+        drlog.debug("Right correction matrix CR:\n" + mx_print(CR))
+
+        drlog.debug("CL * CR:\n" + mx_print(np.matmul(CL, CR)))
+        if not np.allclose(np.matmul(CL, CR), np.identity(dim), atol = atol, rtol = rtol): 
+            raise MxLinalgError(f"CL * CR != I")
+
+        tV = CR.dot(p0)
+        drlog.debug(f"Correction vector tV ({sum(tV)=}):\n{mx_print([tV])}")
+        if not np.allclose(tV, S_.dot(_P.dot(p0))):
+            raise MxLinalgError(f"Numerical problems with tV.")
+
+        for t in times:
+            eLt = np.diag(np.exp(L*t))
+            pt = CL.dot(eLt.dot(tV))
+            if not np.isclose(sum(pt), 1., rtol = rtol, atol = atol):
+                raise MxLinalgError('Unstable simulation at time {t=}: {sum(pt)=}')
+            yield t, np.absolute(pt/sum(np.absolute(pt)))
+            last = t
+            if np.allclose(pt, p8): # No need to calculate any more timepoints!
+                drlog.info(f'Equilibrium reached at time {t=}.')
+                yield times[-1], p8
+                return
+
+    except MxLinalgError as err:
+        drlog.info(f"Exception due to Error: {str(err)}")
+        R = R.T
+        for t in times:
+            if t <= last:
+                continue
+            pt = sl.expm(R * t).dot(p0)
+            if not np.isclose(sum(pt), 1., rtol = rtol, atol = atol):
+                raise MxLinalgError('Unstable simulation at time {t=}: {sum(pt)=}')
+            yield t, np.absolute(pt/sum(np.absolute(pt)))
+            if np.allclose(pt, p8): # No need to calculate any more timepoints!
+                drlog.info(f'Equilibrium reached at time {t=}.')
+                yield times[-1], p8
+                return
+    return
+
 def main():
     """ A python implementation of (some parts of) the treekin program.
 
@@ -193,14 +271,13 @@ def main():
         log_times = np.delete(log_times, 0)
     else:
         log_times = []
+    times = np.concatenate([lin_times, log_times])
 
     # Parse matrix input.
     A = np.loadtxt(args.rate_matrix, dtype=np.float64)
-    np.fill_diagonal(A, -np.einsum('ji->j', A))
-    dim = len(A)
 
     # Parse p0 input.
-    p0 = np.zeros(dim, dtype = np.float64)
+    p0 = np.zeros(len(A), dtype = np.float64)
     for term in args.p0:
         p, o = term.split('=')
         p0[int(p) - 1] = float(o)
@@ -208,57 +285,8 @@ def main():
 
     # TODO: assert ergodicity
 
-    #
-    # Start the linalg stuff.
-    #
-    logger.info(f"Initial occupancy vector ({sum(p0)=}):\n{mx_print([p0])}")
-    logger.info(f"Input matrix A including diagonal elements:\n{mx_print(A)}")
-
-    # Get equilibrium distribution.
-    p8 = get_p8_detbal(A)
-    logger.info(f"Equilibrium distribution vector p8 ({sum(p8)=}):\n{mx_print([p8])}")
-
-    logger.info(f"\nSolving: U = _P8 * A^T * P8_\n")
-    U, _P, P_= mx_symmetrize(A.T, p8)
-    logger.info("Symmetrized matrix U:\n" + mx_print(U))
-    logger.info("1 / sqrt(P8) matrix:\n" + mx_print(_P))
-    logger.info("sqrt(P8):\n" + mx_print(P_))
-    pU8 = get_p8_detbal(U)
-    logger.info(f"Equilibrium distribution vector pU8 ({sum(pU8)=}):\n{mx_print([pU8])}")
-
-    logger.info(f"\nDecomposing: U = _S * L * S_\n")
-    _S, L, S_ = mx_decompose_sym(U)
-    logger.info("Eigenvalues L:\n" + mx_print([L]))
-    logger.info("Eigenvectors _S:\n" + mx_print(_S))
-    logger.info("Eigenvectors S_:\n" + mx_print(S_)) # It's just the transpose of _S!
-    
-    CL = np.matmul(P_, _S)
-    logger.info("Left correction matrix CL:\n" + mx_print(CL))
-    CR = np.matmul(S_, _P)
-    logger.info("Right correction matrix CR:\n" + mx_print(CR))
-
-    logger.info("CL * CR:\n" + mx_print(np.matmul(CL, CR)))
-    assert np.allclose(np.matmul(CL, CR), np.identity(dim), atol = 1e-4, rtol = 1e-4)
-
-    tV = CR.dot(p0)
-    logger.info(f"Correction vector tV ({sum(tV)=}):\n{mx_print([tV])}")
-    assert np.allclose(tV, S_.dot(_P.dot(p0)))
-    assert isinstance(tV[0], np.float64)
-
-    times = np.concatenate([lin_times, log_times])
-    # Simulation of decomposed matrix.
-    for t in times:
-        eLt = np.diag(np.exp(L*t))
-        pt = CL.dot(eLt.dot(tV))
-        pt = CL.dot(np.multiply(np.exp(L*t), tV))
+    for t, pt in mx_simulate(A, p0, times):
         print(f"{t:8.6e} {' '.join([f'{x:8.6e}' for x in abs(pt)])}")
-        if np.allclose(pt, p8, rtol = 1e-4, atol = 1e-4):
-            logger.info(f'# Reached equilibrium at time {t=}.')
-            print(f"{times[-1]:8.6e} {' '.join([f'{x:8.6e}' for x in p8])}")
-            break
-        if not np.isclose(sum(pt), 1., atol = 1e-4):
-            logger.error(f'# Unstable simulation at time {t=}: {sum(pt)=}')
-            break
 
 if __name__ == '__main__':
     main()

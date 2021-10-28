@@ -3,10 +3,8 @@
 # DrTransformer -- cotranscriptional folding.
 #
 import logging
-import os
-import sys
+import os, sys, argparse
 import math
-import argparse
 import numpy as np
 from packaging import version
 
@@ -15,9 +13,9 @@ from datetime import datetime
 
 import RNA
 from . import __version__, _MIN_VRNA_VERSION 
-from .utils import parse_vienna_stdin, get_tkn_simulation_files
 from .landscape import TrafoLandscape
-from .pathfinder import top_down_coarse_graining
+from .rnafolding import top_down_coarse_graining, parse_model_details
+from .utils import parse_vienna_stdin, get_tkn_simulation_files
 
 def restricted_float(x):
     y = float(x)
@@ -58,28 +56,6 @@ def sorted_trajectories(nlist, tfile, plot_cgm = None, mapping = None):
                     # is it above visibility threshold?
                     yield time, nlist[e], occu 
     return
-
-def parse_model_details(parser):
-    """ ViennaRNA Model Details Argument Parser.  """
-    model = parser.add_argument_group('ViennaRNA model details')
-
-    model.add_argument("-T", "--temp", type = float, default = 37.0, metavar = '<flt>',
-        help = 'Rescale energy parameters to a temperature of temp C.')
-
-    model.add_argument("-4", "--noTetra", action = "store_true",
-        help = 'Do not include special tabulated stabilizing energies for tri-, tetra- and hexaloop hairpins.')
-
-    model.add_argument("-d", "--dangles", type = int, default = 2, metavar = '<int>',
-        help = 'How to treat "dangling end" energies for bases adjacent to helices in free ends and multi-loops.')
-
-    model.add_argument("--noGU", action = "store_true",
-        help = 'Do not allow GU/GT pairs.')
-
-    model.add_argument("--noClosingGU", action = "store_true",
-        help = 'Do not allow GU/GT pairs at the end of helices.')
-
-    model.add_argument("-P", "--paramFile", action = "store", default = None, metavar = '<str>',
-        help = 'Read energy parameters from paramfile, instead of using the default parameter set.')
 
 def parse_drtrafo_args(parser):
     """ A collection of arguments that are used by DrTransformer """

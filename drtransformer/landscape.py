@@ -9,216 +9,15 @@ drlog = logging.getLogger(__name__)
 
 import math
 import numpy as np
-import scipy
-import scipy.linalg as sl
 from datetime import datetime
-from itertools import combinations, product, islice
 
 import RNA
-from .utils import make_pair_table
-from .pathfinder import (get_guide_graph, 
+
+from .rnafolding import (get_guide_graph, 
                          neighborhood_flooding,
+                         find_fraying_neighbors,
                          top_down_coarse_graining)
-from .linalg import get_p8_detbal, mx_symmetrize, mx_decompose_sym, mx_print
-
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-# Custom error definitions                                                     #
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-class TrafoUsageError(Exception):
-    pass
-
-class TrafoAlgoError(Exception):
-    pass
-
-class DebuggingAlert(Exception):
-    pass
-
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-# Cache to fold exterior loops.                                                #
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-EFOLD_CACHE = {}
-
-def fold_exterior_loop(seq, con, md, cache = None, spacer = 'NNN'):
-    """ Constrained folding of the exterior loop.
-
-    All constrained helices are replaced with the motif:
-        NNNNNNN
-        ((xxx))
-    for example a helix with the closing-stack CG-UG:
-        CG ~ UG -> CGNNNUG
-        (( ~ )) -> ((xxx))
-    This reduces the sequence length (n) and therefore the runtime O(n^3),
-    and it enables the identification of independent structures with the same
-    exterior loop features.
-
-    Args:
-        seq (str):          RNA sequence
-        con (str):          RNA structure constraint
-        md (RNA.md()):      ViennaRNA model details (temperature, noLP, etc.)
-        spacer (str, optional): Specify the sequence of the spacer region.
-                            Defaults to 'NNN'.
-
-    Returns:
-      (str, str):
-    """
-    if cache is None:
-        global EFOLD_CACHE
-    else:
-        EFOLD_CACHE = cache
-
-    pt = make_pair_table(con, base = 0)
-    ext_seq = ''
-    ext_con = ''
-
-    # shrink the sequences
-    skip = 0
-    for i, j in enumerate(pt):
-        if i < skip:
-            continue
-        if j == -1:
-            ext_seq += seq[i]
-            ext_con += '.'
-        else:
-            ext_seq += seq[i] + seq[i + 1]
-            ext_seq += spacer
-            ext_seq += seq[j - 1] + seq[j]
-            ext_con += '(('
-            ext_con += 'x' * len(spacer)
-            ext_con += '))'
-            skip = j + 1
-
-    # If we have seen this exterior loop before, then we don't need to
-    # calculate again, and we have to trace back if the parents are connected.
-    if ext_seq in EFOLD_CACHE:
-        css = EFOLD_CACHE[ext_seq]
-    else:
-        fc_tmp = RNA.fold_compound(ext_seq, md)
-        fc_tmp.constraints_add(ext_con, 
-                RNA.CONSTRAINT_DB_DEFAULT | RNA.CONSTRAINT_DB_ENFORCE_BP)
-        css, cfe = fc_tmp.mfe()
-        EFOLD_CACHE[ext_seq] = css
-        del fc_tmp
-
-    # replace characters in constraint
-    c, skip = 0, 0
-    for i, j in enumerate(pt):
-        if i < skip:
-            continue
-        if j == -1:
-            con = con[:i] + css[c] + con[i + 1:]
-            c += 1
-        else:
-            c += len(spacer) + 4
-            skip = j + 1
-
-    return con, ext_seq
-
-def open_fraying_helices(seq, ss, free = 6):
-    """ Generate structures with opened fraying helices. 
-    
-    Fraying helices share a base-pair with an exterior loop region. The
-    function returns n structures, where the first n-1 correspond to individual
-    fraying helices opened respectively and structure n has all fraying helices
-    opened at once.
-
-    Args:
-        seq (str): Primary structure.
-        ss (str): Secondary structure.
-        free (int, optional): Minimal number of bases freed by a fraying helix
-            move. If less bases are freed, and there exists a nested helix, then
-            that helix is opened as well. Defaults to 6.
-    """
-    nbrs = set()
-    pt = make_pair_table(ss, base = 0)
-
-    # mutable secondary structure
-    nbr = list(ss)
-
-    def rec_fill_nbrs(ss, mb, pt, myrange, free):
-        """Recursive helix opening
-    
-        TODO: Function needs testing, but looks good.
-    
-        Args:
-            nbrs (set): A set of all neighboring conformations.
-            ss (str): Reference secondary structure
-            mb (list): A mutable version of ss, which will have all fraying helices
-                opened at once.
-            pt (list): A pair table (zero based)
-            myrange (int, int): the range (n, m) of the pt under current
-                investigation.  
-            free: number of bases that should be freed
-    
-        Returns:
-            None: mutates the mutable arguments.
-        """
-        (n, m) = myrange
-        skip = 0  # fast forward in case we have deleted stuff
-        for i in range(n, m):
-            j = pt[i]
-            if j == -1:
-                continue
-            if i < skip:
-                continue
-    
-            nb = list(ss)
-            [o, l] = [0, 0]
-            [p, q] = [i, j]
-    
-            add = True
-            while p < q and (l == 0 or o < free):
-                if pt[p] != q or p != pt[q]:
-                    """ this is a multiloop """
-                    rec_fill_nbrs(''.join(nb), mb, pt, (p, q), free - o)
-                    add = False
-                    break
-                # remove the base-pairs
-                pt[p] = pt[q] = -1
-                nb[p] = nb[q] = '.'
-                mb[p] = mb[q] = '.'
-                o += 2  # one base-pair deleted, two bases freed
-    
-                l = 0  # reset interior-loop size
-                while (p < q and pt[p + 1] == -1):
-                    [p, l] = [p + 1, l + 1]
-                p += 1
-                while (p < q and pt[q - 1] == -1):
-                    [q, l] = [q - 1, l + 1]
-                q -= 1
-                o += l
-    
-            if add:
-                nbrs.add(''.join(nb))
-            skip = j + 1
-        return
-
-    rec_fill_nbrs(ss, nbr, pt, (0, len(ss)), free)
-    nbrs.add(''.join(nbr))
-    return nbrs
-
-def find_fraying_neighbors(seq, md, parents, mfree = 6):
-    """ 
-    Returns:
-        dict: new_nodes[parent]=set(neigbors)
-    """
-    future = '.' * (len(parents[0]) - len(seq))
-    # Keep track of all nodes and how they are related to parents.
-    new_nodes = dict() 
-    for ni in parents:
-        # short secondary structure (without its future)
-        sss = ni[0:len(seq)]
-        assert len(sss + future) == len(parents[0])
-        # compute a set of all helix fraying open steps
-        opened = open_fraying_helices(seq, sss, mfree)
-        # Do a constrained exterior loop folding for all fraying structures
-        connected = set() 
-        for onbr in opened:
-            nbr, _ = fold_exterior_loop(seq, onbr, md)
-            nbr += future
-            connected.add(nbr)
-        connected.discard(ni) # remove the parent
-        new_nodes[ni] = connected
-    return new_nodes
+from .linalg import mx_simulate
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 # Transformer Landscape Object                                                 #
@@ -420,7 +219,7 @@ class TrafoLandscape:
             on = set()
         else: 
             md = self.md
-            parents = list(self.active_local_mins)
+            parents = [x[0:len(seq)] for x in self.active_local_mins]
             fraying_nodes = find_fraying_neighbors(seq, md, parents, mfree = 6)
 
             # 1) Add all new structures to the set of nodes.
@@ -435,6 +234,7 @@ class TrafoLandscape:
 
             for fns in fraying_nodes.values():
                 for fn in fns:
+                    fn += future
                     if fn not in self.nodes:
                         self.addnode(fn, structure = fn)
                         nn.add(fn)
@@ -564,8 +364,6 @@ class TrafoLandscape:
             self.nodes[n]['occupancy'] = pt[i]
 
     def simulate(self, snodes, p0, times, atol = 1e-4, rtol = 1e-4):
-        # print files into a backup directory (we still want to allow an optional treekin simulation.
-
         assert np.isclose(sum(p0), 1)
         dim = len(snodes)
 
@@ -579,45 +377,9 @@ class TrafoLandscape:
             for j, nj in enumerate(snodes):
                 if self.has_cg_edge(ni, nj):
                     R[i][j] = self.cg_edges[(ni, nj)]['weight']
-        np.fill_diagonal(R, -np.einsum('ji->j', R))
 
-        drlog.debug("Initial occupancy vector:\n" + mx_print([p0]))
-        drlog.debug("Input matrix A including diagonal elements:\n" + mx_print(R))
-
-        last = -1
-        try:
-            p8 = get_p8_detbal(R)
-            assert all(p > 0 for p in p8), "Negative elements in p8"
-            drlog.debug("Equilibrium distribution vector p8:\n" + mx_print([p8]))
-
-            U, _P, P_= mx_symmetrize(R.T, p8)
-            _S, L, S_ = mx_decompose_sym(U)
-            CL = np.matmul(P_, _S)
-            CR = np.matmul(S_, _P)
-            assert np.allclose(np.matmul(CL, CR), np.identity(dim), atol = 1e-5, rtol = 1e-5), "CL * CR != I"
-
-            tV = CR.dot(p0)
-            assert np.allclose(tV, S_.dot(_P.dot(p0))), "Numerical problems with tV."
-
-            for t in times:
-                eLt = np.diag(np.exp(L*t))
-                pt = CL.dot(eLt.dot(tV))
-                assert np.isclose(sum(pt), 1., rtol = rtol, atol = atol), f'# Unstable simulation at time {t=}: {sum(pt)=}'
-                yield t, np.absolute(pt/sum(np.absolute(pt)))
-                last = t
-                if np.allclose(pt, p8):
-                    drlog.debug(f'# Equilibrium reached at time {t=}.')
-                    yield times[-1], p8
-                    return
-        except AssertionError as err:
-            drlog.debug(f"Exception due to Error: {str(err)}")
-            R = R.T
-            for t in times:
-                if t <= last:
-                    continue
-                pt = sl.expm(R * t).dot(p0)
-                yield t, np.absolute(pt/sum(np.absolute(pt)))
-            return
+        for t, pt in mx_simulate(R, p0, times, atol = atol, rtol = rtol):
+            yield t, pt
         return
 
     def prune(self, pmin, delth = 10, keep = None):
