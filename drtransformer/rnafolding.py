@@ -75,7 +75,7 @@ def find_fraying_neighbors(seq, md, parents, mfree = 6):
         new_nodes[pss] = nbrs
     return new_nodes
 
-def open_fraying_helices(seq, ss, free = 6):
+def open_fraying_helices(seq, ss, mfree = 6):
     """ Generate structures with opened fraying helices. 
     
     Fraying helices share a base-pair with an exterior loop region. The
@@ -86,7 +86,7 @@ def open_fraying_helices(seq, ss, free = 6):
     Args:
         seq (str): Primary structure.
         ss (str): Secondary structure.
-        free (int, optional): Minimal number of bases freed by a fraying helix
+        mfree (int, optional): Minimal number of bases freed by a fraying helix
             move. If less bases are freed, and there exists a nested helix, then
             that helix is opened as well. Defaults to 6.
     """
@@ -94,7 +94,7 @@ def open_fraying_helices(seq, ss, free = 6):
     pt = list(RNA.ptable(ss))
     nbr = list(ss)
 
-    def gen_nbrs(ss, mb, pt, myrange, free):
+    def gen_nbrs(ss, mb, pt, myrange, mfree):
         """Recursive helix opening.
     
         Args:
@@ -102,7 +102,7 @@ def open_fraying_helices(seq, ss, free = 6):
             mb (list): A mutable version of ss, to open *all* fraying helices.
             pt (list): ViennaRNA pair table.
             myrange (int, int): The currently interesting range (n, m) of pt.
-            free: The number of bases to be freed.
+            mfree: The number of bases to be freed.
     
         Yields:
             (str): secondary structures without fraying helices.
@@ -118,11 +118,11 @@ def open_fraying_helices(seq, ss, free = 6):
             [o, l] = [0, 0]
             [p, q] = [i, j]
     
-            while p < q and (l == 0 or o < free):
+            while p < q and (l == 0 or o < mfree):
                 pp, qq = p+1, q+1
                 if pt[pp] != qq or pp != pt[qq]:
                     # it is a multiloop.
-                    for nb in gen_nbrs(''.join(nb), mb, pt, (p, q), free - o):
+                    for nb in gen_nbrs(''.join(nb), mb, pt, (p, q), mfree - o):
                         yield nb
                     break
                 # remove the base-pairs
@@ -145,7 +145,7 @@ def open_fraying_helices(seq, ss, free = 6):
         return
 
     count = 0
-    for nb in gen_nbrs(ss, nbr, pt, (0, len(ss)), free):
+    for nb in gen_nbrs(ss, nbr, pt, (0, len(ss)), mfree):
         count += 1
         yield nb
     if count > 1:
@@ -527,7 +527,7 @@ def findpath_merge(outside, inside, i, j):
         path2.append((merged, energy))
     return (path1, bh1) if bh1 < bh2 else (path2, bh2)
 
-def findpath_split(seq, ss1, ss2, md, th = 5, fpw = 4, mxb = float('inf')):
+def findpath_split(seq, ss1, ss2, md, th = 5, fpwm = 4, mxb = float('inf')):
     """ Calculate findpath barriers for smaller components.
 
     Args:
@@ -569,11 +569,11 @@ def findpath_split(seq, ss1, ss2, md, th = 5, fpw = 4, mxb = float('inf')):
             break
 
     if mindiff is not None:
-        pathO, _ = findpath_split(*recurse[1], md, th, fpw, mxb)
-        pathI, _ = findpath_split(*recurse[2], md, th, fpw, mxb)
+        pathO, _ = findpath_split(*recurse[1], md, th, fpwm, mxb)
+        pathI, _ = findpath_split(*recurse[2], md, th, fpwm, mxb)
         return findpath_merge(pathO, pathI, *recurse[0])
     else:
-        w = fpw * RNA.bp_distance(ss1, ss2)
+        w = fpwm * RNA.bp_distance(ss1, ss2)
         return call_findpath(seq, ss1, ss2, md, fpw = w, mxb = mxb)
 
 def call_findpath(seq, ss1, ss2, md, fpw, mxb = float('inf')):
@@ -687,14 +687,15 @@ def edge_flooding(fp, s1, s2, e1, e2, minh = None):
                         two basins in dcal/mol.
     """
     if isinstance(fp, tuple):
-        (seq, md) = fp
-        path, barrier = findpath_split(seq, s1, s2, md)
+        (seq, md, fpwm) = fp
+        path, barrier = findpath_split(seq, s1, s2, md, fpwm = fpwm)
         if path[0][1] == 0:
             for i in range(len(path)):
                 path[i] = (path[i][0], path[i][1] + e1)
         sen = e1 + barrier
     else:
-        sen, path = findpath_max(fp, s1, s2)
+        raise NotImplementedError('This is just a placeholder for new findpath object.')
+        #sen, path = findpath_max(fp, s1, s2)
 
     assert path[0][1] == e1
 
@@ -983,8 +984,8 @@ def call_findpath_exe():
 
     mxb = float('inf') if args.max_barrier is None else args.max_barrier
     if args.split:
-        fpw = args.search_width_multiplier
-        path, bar = findpath_split(seq, ss1, ss2, md, th = 5, fpw = fpw, mxb = mxb)
+        fpwm = args.search_width_multiplier
+        path, bar = findpath_split(seq, ss1, ss2, md, th = 5, fpwm = fpwm, mxb = mxb)
     else:
         fpw = args.search_width_multiplier * RNA.bp_distance(ss1, ss2)
         path, bar = call_findpath(seq, ss1, ss2, md, fpw = fpw, mxb = mxb)

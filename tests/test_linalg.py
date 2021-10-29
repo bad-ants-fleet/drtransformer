@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 import numpy as np
 import scipy
@@ -51,7 +51,7 @@ class MatrixOperations(unittest.TestCase):
         assert all(U[i][j] == U[j][i] for (i, j) in combinations(range(dim), 2))
 
     def test_mx_decompose_sym_00(self):
-        # TODO: I think this test may break, since different eigenvectors may
+        # NOTE: I think this test may break, since different eigenvectors may
         # be returned. At some point these test should contain examples
         # calculated by pen and paper.
         mx = """

@@ -72,7 +72,7 @@ class FrayingNeighborsTests(unittest.TestCase):
         se = "CUCGUCGCCUUAAUCCAGUGCGGGCGCUAGACAUCUAGUUAUCGCCGC"
         ss = ".....(((((......)).)))((((((((....))))....)))).."
 
-        out = open_fraying_helices(se, ss, free=6)
+        out = open_fraying_helices(se, ss, mfree=6)
 
         res = [
             "........((......))....((((((((....))))....))))..",
@@ -81,7 +81,7 @@ class FrayingNeighborsTests(unittest.TestCase):
 
         self.assertEqual(sorted(out), sorted(res))
 
-        out = open_fraying_helices(se, ss, free=8)
+        out = open_fraying_helices(se, ss, mfree=8)
 
         res = [
             "......................((((((((....))))....))))..",
@@ -94,11 +94,11 @@ class FrayingNeighborsTests(unittest.TestCase):
         se = "CUCGUCGCCUUAAUCCAGUGCGGGCGCUAGACAUCUAGUUAUCGCCGCG"
         ss = "..((.(((((......)).)))((((((((....))))....)))).))"
 
-        out = list(open_fraying_helices(se, ss, free=6))
+        out = list(open_fraying_helices(se, ss, mfree=6))
         res = [".....(((((......)).)))((((((((....))))....))))..."]
         self.assertEqual(sorted(out), sorted(res))
 
-        out = list(open_fraying_helices(se, ss, free=7))
+        out = list(open_fraying_helices(se, ss, mfree=7))
         res = [
             "........((......))....((((((((....))))....))))...",
             ".....(((((......)).)))....((((....))))...........",
@@ -493,6 +493,7 @@ class TopDownCoarseGrainTests(unittest.TestCase):
                (38, "...(((((((..(((((((...((((.........))))...)))))))...((((((.((...........)).)))))))))))))............", -20.90),
                (39, "....(((((((.(((((((...((((.........))))...)))))))....((........))............)))))))................", -17.60)]
         md = RNA.md()
+        fpwm = 4
         myminh = 300
 
         ndata = {ssx: {'energy': int(round(enx*100)), 'identity': idx} for (idx, ssx, enx) in sss}
@@ -504,7 +505,7 @@ class TopDownCoarseGrainTests(unittest.TestCase):
         for nid, (ss, en) in enumerate(gnodes, 40):
             ndata[ss] = {'energy': en, 'identity': 40}
 
-        ndata, edata = neighborhood_flooding((seq, md), ndata, gedges, minh = myminh)
+        ndata, edata = neighborhood_flooding((seq, md, fpwm), ndata, gedges, minh = myminh)
         assert len(ndata) == 80
         assert len(edata) == 316
 

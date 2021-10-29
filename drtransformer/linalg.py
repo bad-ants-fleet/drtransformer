@@ -282,7 +282,7 @@ def main():
         p0[int(p) - 1] = float(o)
     assert np.isclose(sum(p0), 1)
 
-    # TODO: assert ergodicity
+    # NOTE: a good point to assert ergodicity.
 
     for t, pt in mx_simulate(A, p0, times):
         print(f"{t:8.6e} {' '.join([f'{x:8.6e}' for x in abs(pt)])}")

@@ -124,14 +124,13 @@ def parse_drtrafo_args(parser):
             # Enforce a setting against all warnings.
             help = argparse.SUPPRESS)
 
-    # TODO: findpath width is flexible by default, easy to implement though.
-    #algo.add_argument("--fpwm", type = int, default = 4, metavar = '<int>',
-    #        help = """Findpath search width multiplier. This value times the
-    #        base-pair distance results in the findpath search width. Higher
-    #        values increase the chances to find energetically better transition
-    #        state energies.""")
+    algo.add_argument("--fpwm", type = int, default = 4, metavar = '<int>',
+            help = """Findpath search width multiplier. This value times the
+            base-pair distance results in the findpath search width. Higher
+            values increase the chances to find energetically better transition
+            state energies.""")
 
-    algo.add_argument("--min-fraying", type = int, default = 6, metavar = '<int>',
+    algo.add_argument("--mfree", type = int, default = 6, metavar = '<int>',
             help = """Minimum number of freed bases during helix fraying.
             Fraying helices can vary greatly in length, starting with at
             least two base-pairs. This parameter defines the minimum amount of
@@ -139,6 +138,9 @@ def parse_drtrafo_args(parser):
             stack of two base-pairs and a loop region of 2 nucleotides. If less
             bases are freed and there exists a nested stacked helix, this helix
             is considered to fray as well.""")
+
+    algo.add_argument("--delth", type = int, default = 10, metavar = '<int>',
+            help = """Delete structures if inactive for more than *delth* rounds.""")
 
     algo.add_argument("--k0", type = float, default = 2e5, metavar = '<flt>',
             help = """Arrhenius rate constant (pre-exponential factor). Adjust
@@ -258,12 +260,16 @@ def main():
     # the rate of chain elongation (kx), it
     # should also be much slower than one over the
     # post-transcriptional simulation time --t-end
+    # NOTE: k-slow is not supported anymore. It was 
+    # primarily motivated by numeric instabilities 
+    # during simulations, caused by large differences 
+    # in rate constants. Those seem to be resolved.
     #
     # Parameters:
     # k0 = maximum folding rate /s
     # t-ext = time for chain elongation
     # t-end = post-transcriptional simulation time
-    # t0 = first simulation output time (<< t8)
+    # and a few more ...
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
     if args.minh:
@@ -314,8 +320,8 @@ def main():
         fdata += "# Algorithm parameters:\n"
         fdata += "# --o-prune: {}\n".format(args.o_prune)
         fdata += "# --t-fast: {} sec\n".format(args.t_fast)
-        #fdata += "# --findpath-search-width: {}\n".format(args.findpath_search_width)
-        fdata += "# --min-fraying: {} nuc\n".format(args.min_fraying)
+        fdata += "# --fpwm: {}\n".format(args.fpwm)
+        fdata += "# --mfree: {} nuc\n".format(args.mfree)
         fdata += "# --k0: {}\n".format(args.k0)
         fdata += "#\n"
         fdata += "# ViennaRNA model details:\n"
@@ -342,8 +348,10 @@ def main():
     # Initialize a directed conformation graph
     TL = TrafoLandscape(fullseq, vrna_md)
     TL.k0 = args.k0
+    TL.fpwm = args.fpwm
+    TL.mfree = args.mfree
     TL.minh = int(round(args.minh*100)) if args.minh else 0
-    TL._transcript_length = args.start - 1
+    TL.transcript_length = args.start - 1
 
     psites = np.full(args.stop - args.start + 1, args.t_ext, dtype = float)
     if args.pause_sites:
@@ -361,15 +369,14 @@ def main():
     #import statprof
     #statprof.start()
 
+    time = 0
     for tlen in range(args.start, args.stop):
-        time = TL.total_time
-
         logger.info(f'** Transcription step {tlen} **')
         logger.info(f'Before expansion:      {len(list(TL.active_local_mins)):3d} active lmins, {len(list(TL.active_nodes)):3d} active structures, {len(list(TL.inactive_nodes)):3d} inactive structures.')
         itime = datetime.now()
 
         # Get new nodes and connect them.
-        nn, on = TL.expand(mfree = args.min_fraying)
+        nn, on = TL.expand()
         logger.info(f'After expansion:                         {len(list(TL.active_nodes)):3d} active structures, {len(list(TL.inactive_nodes)):3d} inactive structures.' +
                     f' (Found {len(nn)} new nodes and revisited {len(on)} pruned nodes.)')
         etime = datetime.now()
@@ -449,7 +456,7 @@ def main():
             ti, p8 = t, pt
         keep = [n for e, n in enumerate(snodes) if pf[e] > args.o_prune] if args.o_prune else []
         TL.set_occupancies(snodes, p8)
-        TL.total_time += ti
+        time += ti
 
         # ~~~~~~~~~~~~~~~~~~~~~~~~~ #
         # Output simulation results #
@@ -475,7 +482,7 @@ def main():
         # Prune #
         # ~~~~~ #
         if args.o_prune > 0:
-            delth = 10 # delete structures if inactive for more than 10 rounds.
+            delth = args.delth
             pn, dn = TL.prune(args.o_prune, delth, keep) 
             logger.info(f'After pruning:         {len(list(TL.active_local_mins)):3d} active lmins, {len(list(TL.active_nodes)):3d} active structures, {len(list(TL.inactive_nodes)):3d} inactive structures.' +
                     f' (Pruned {len(pn)} nodes with combined occupancy below {args.o_prune:.2f}, kept {len(keep)} nodes due to lookahead, deleted {len(dn)} nodes inactive for {delth} transcription steps.)')
