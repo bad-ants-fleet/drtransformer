@@ -365,13 +365,18 @@ class TrafoLandscape:
         for i, n in enumerate(snodes):
             self.nodes[n]['occupancy'] = pt[i]
 
-    def simulate(self, snodes, p0, times, atol = 1e-4, rtol = 1e-4):
+    def simulate(self, snodes, p0, times, force = None, atol = 1e-4, rtol = 1e-4):
         assert np.isclose(sum(p0), 1)
         dim = len(snodes)
 
         if dim == 1:
+            if force is None:
+                force = [times[-1]]
+            elif force[-1] < times[-1]:
+                force.append(times[-1])
             yield times[0], [1]
-            yield times[-1], [1]
+            for ft in force:
+                yield ft, [1]
             return
 
         R = np.zeros((dim, dim))
@@ -380,7 +385,7 @@ class TrafoLandscape:
                 if self.has_cg_edge(ni, nj):
                     R[i][j] = self.cg_edges[(ni, nj)]['weight']
 
-        for t, pt in mx_simulate(R, p0, times, atol = atol, rtol = rtol):
+        for t, pt in mx_simulate(R, p0, times, force = force, atol = atol, rtol = rtol):
             yield t, pt
         return
 

@@ -9,11 +9,107 @@
 import logging
 drlog = logging.getLogger(__name__)
 
+import numpy as np
 import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 from . import __version__
 from .utils import make_pair_table, make_loop_index
+
+def plot_simulation(trajectories, basename, formats, 
+                    lin_time, log_time, tlen = None, motifs = None, title = ''):
+    """DrTransformer standard plotting function.
+    """
+
+    fig, axs = plt.subplots(1, 2, gridspec_kw={'width_ratios': [1.8, 1]})
+    fig.set_size_inches(7, 3)
+    plt.subplots_adjust(wspace=0)
+
+    [ax1, ax2] = axs
+    ax1.set_xscale('linear')
+    ax1.spines['right'].set_visible(False)
+    ax1.set_xlim((0, lin_time))
+    ax1.set_ylim([-0.02, 1.02])
+    # Tick business
+    xticks = [round(x, 2) for x in np.linspace(0, lin_time, 6)]
+    ax1.set_xticks(xticks)
+
+    ax2.set_xscale('log')
+    ax2.spines['left'].set_visible(False)
+    ax2.set_xlim((lin_time, log_time))
+    ax2.set_ylim([-0.02, 1.02])
+    # Tick business
+    ax2.yaxis.tick_right()
+    ax2.set_yticklabels([])
+
+    ax1t = ax1.twiny()
+    ax1t.spines['right'].set_visible(False)
+    ax1t.set_xlim(ax1.get_xlim())
+    # Tick business
+    att, atl = zip(*tlen)
+    tl = [int(x) for x in np.linspace(atl[0], atl[-1], 10)]
+    tt = [t for e, (t, l) in enumerate(tlen) if l in tl]
+    ax1t.set_xticks(tt)
+    ax1t.set_xticklabels(tl)
+    ax1t.set_xticks(att, minor = True)
+
+    # Mark the end of transcription.
+    ax1.axvline(x = lin_time, linewidth = 2, color = 'black', linestyle = '-') 
+    ax2.axvline(x = lin_time, linewidth = 2, color = 'black', linestyle = '-') 
+
+    # Set the grid lines.
+    ax1.grid(axis = 'y', which = 'major', alpha = 0.7,
+             color='gray', linestyle='--', linewidth=0.5)
+    ax2.grid(axis = 'y', which = 'major', alpha = 0.7, 
+             color='gray', linestyle='--', linewidth=0.5)
+    ax1t.grid(which = 'major', alpha = 0.7,
+             color='gray', linestyle='--', linewidth=0.5)
+
+    # Plot the data.
+    if motifs:
+        lw = {'pp': 2, 'pm': .5, 'mm': 1}
+        dh = {'pp': '-', 'pm': ':', 'mm': '--'}
+        zo = {'pp': 1,   'pm': 2,    'mm': 3}
+        for i, (name, _) in enumerate(motifs):
+            for suffix in ['pp', 'pm', 'mm']:
+                line = trajectories[f'{name}-{suffix}']
+                t, o = list(zip(*line))
+                if max(o) >= 0.1:
+                    p, = ax1.plot(t, o, dh[suffix], lw=lw[suffix], 
+                                 color = f'C{i}', zorder = zo[suffix])
+                    l, = ax2.plot(t, o, dh[suffix], lw=lw[suffix], 
+                                    color = f'C{i}', zorder = zo[suffix])
+                    l.set_label(f'{name}-{suffix}')
+
+    else:
+        for ni in sorted(trajectories):
+            line = trajectories[ni]
+            t, o = list(zip(*line))
+            # Determine which lines are part of the legend:
+            # like this, it is only those that are populated
+            # at the end of transcription and if they reach
+            # an occupancy of 10% or higher
+            if t[-1] > lin_time:
+                p, = ax1.plot(t, o, '-', lw=1.5)
+                l, = ax2.plot(t, o, '-', lw=1.5)
+                if max(o) >= 0.1:
+                    l.set_label(f"ID {ni}")
+            elif max(o) >= 0.1:
+                p, = ax1.plot(t, o, '-', lw=1)
+                l, = ax2.plot(t, o, '-', lw=1)
+
+    # Legends and labels.
+    ax1.set_ylabel('occupancy')
+    ax1.set_xlabel('time (seconds)')
+    ax1.xaxis.set_label_coords(0.7, -0.15)
+    ax1t.set_xlabel(f'{title} transcript length')
+    ax1t.xaxis.set_label_coords(0.7, 1.15)
+    ax2.legend()
+
+    # Save a file.
+    for ending in formats:
+        pfile = basename + '.' + ending
+        plt.savefig(pfile, bbox_inches = 'tight')
+    return
 
 def motif_finder(ss, motif):
     pt = make_pair_table(ss, base = 1)
@@ -75,90 +171,14 @@ def plot_xmgrace(trajectories, filename):
             gfh.write("&\n")
     return
 
-def plot_simulation(trajectories, basename, formats, 
-                    lin_time, log_time, motifs = None, title = ''):
-    """DrTransformer simulation plotting.
-    """
-    assert log_time >= lin_time * 10
-
-    # Do the plotting
-    fig = plt.figure()
-    ax = fig.add_subplot(1, 1, 1)
-    ax.spines['right'].set_visible(False)
-    ax.set_ylim([-0.05, 1.05])
-    ax.set_xscale('linear')
-
-    # Make the second part of the plot logarithmic
-    offset = 0.00001
-    ax.set_xlim((0, lin_time + offset))
-    divider = make_axes_locatable(ax)
-    axLog = divider.append_axes("right", size=2.5, pad=0, sharey=ax)
-    axLog.set_xscale('log')
-    axLog.set_xlim((lin_time + offset, log_time))
-    axLog.set_ylim([-0.05, 1.05])
-    axLog.yaxis.set_visible(False)
-    axLog.spines['left'].set_visible(False)
-
-    if motifs:
-        lw = {'pp': 2, 'pm': .5, 'mm': 1}
-        dh = {'pp': '-', 'pm': ':', 'mm': '--'}
-        zo = {'pp': 1,   'pm': 2,    'mm': 3}
-        for i, (name, _) in enumerate(motifs):
-            for suffix in ['pp', 'pm', 'mm']:
-                line = trajectories[f'{name}-{suffix}']
-                t, o = list(zip(*line))
-                if max(o) >= 0.1:
-                    p, = ax.plot(t, o, dh[suffix], lw=lw[suffix], 
-                                 color = f'C{i}', zorder = zo[suffix])
-                    L, = axLog.plot(t, o, dh[suffix], lw=lw[suffix], 
-                                    color = f'C{i}', zorder = zo[suffix])
-                    L.set_label(f'{name}-{suffix}')
-
-    else:
-        for ni in sorted(trajectories):
-            line = trajectories[ni]
-            t, o = list(zip(*line))
-            # Determine which lines are part of the legend:
-            # like this, it is only those that are populated
-            # at the end of transcription and if they reach
-            # an occupancy of 10% or higher
-            if t[-1] > lin_time:
-                p, = ax.plot(t, o, '-', lw=1.5)
-                L, = axLog.plot(t, o, '-', lw=1.5)
-                if max(o) >= 0.1:
-                    L.set_label(f"ID {ni}")
-            elif max(o) >= 0.1:
-                p, = ax.plot(t, o, '-', lw=0.5)
-                L, = axLog.plot(t, o, '-', lw=0.5)
-
-    fig.set_size_inches(7, 3)
-    fig.text(0.5, 0.95, title, ha='center', va='center')
-
-    # Add ticks for 1 minute, 1 hour, 1 day, 1 year
-    axLog.axvline(x = lin_time, linewidth = 3, color = 'black', linestyle = '-') 
-    axLog.axvline(x = 60, linewidth = 1, color = 'black', linestyle = '--') # 1 minute
-    axLog.axvline(x = 3600, linewidth = 1, color = 'black', linestyle = '--') # 1 hour
-    axLog.axvline(x = 86400, linewidth = 1, color = 'black', linestyle = '--') # 1 day
-    axLog.axvline(x = 31536000, linewidth = 1, color = 'black', linestyle = '--') # 1 year
-    plt.legend()
-
-    ax.set_ylabel('occupancy', fontsize = 11)
-    ax.set_xlabel('time [s]', ha = 'center', va = 'center', fontsize = 11)
-    ax.xaxis.set_label_coords(.9, -0.15)
-
-    for ending in formats:
-        pfile = basename + '.' + ending
-        plt.savefig(pfile, bbox_inches = 'tight')
-    return
-
 def parse_drf_motifs(stream, motifs):
     xydata = {}
     for (name, m) in motifs:
         xydata[f'{name}-pp'] = [[0, 0]] # present
         xydata[f'{name}-pm'] = [[0, 0]] # compatible
         xydata[f'{name}-mm'] = [[0, 1]] # incompatible
-
-    llen, lint, ltime = 0, 0, '0'
+    time_len = []
+    llen, lint, ltime, lltime = 0, 0, '0', '0'
     for e, line in enumerate(stream):
         if e == 0:
             continue
@@ -173,27 +193,35 @@ def parse_drf_motifs(stream, motifs):
             suffix = motif_finder(ss, m) # none, true, false?
             xydata[f'{name}-{suffix}'][-1][1] += occu
         if len(ss) > llen:
-            lint = time
             llen = len(ss)
-        ltime = stime
-    logt = time if time > 10 * lint else 10 * lt
-    return xydata, lint, logt
+            lint = float(lltime)
+            time_len.append((float(lltime), len(ss)))
+        if ltime != stime:
+            ltime = stime
+            lltime = ltime
+    logt = time if time > lint + 60 else lint + 60
+    return xydata, lint, logt, time_len
 
 def parse_drf(stream):
     xydata = {}
-    llen, lint = 0, 0
+    time_len = []
+    llen, lint, ltime, lltime = 0, 0, '0', '0'
     for e, line in enumerate(stream):
         if e == 0:
             continue
-        [idx, time, occu, ss, en] = line.split()
-        time = float(time)
+        [idx, stime, occu, ss, en] = line.split()
+        time = float(stime)
         occu = float(occu)
         xydata[idx] = (xydata.get(idx, [])) + [(time, occu)]
         if len(ss) > llen:
-            lint = time
             llen = len(ss)
-    logt = time if time > 10 * lint else 10 * lt
-    return xydata, lint, logt
+            lint = float(lltime)
+            time_len.append((float(lltime), len(ss)))
+        if ltime != stime:
+            ltime = stime
+            lltime = ltime
+    logt = time if time > lint + 60 else lint + 60
+    return xydata, lint, logt, time_len
 
 def main():
     """ DrPlotter -- visulization of cotranscriptional folding simulations.
@@ -217,6 +245,8 @@ def main():
             help = """Plot the simulation using matplotlib (pdf, svg, png)
             and/or write an input file for xmgrace (gr). The legend uses 
             the identities of structures as specifed in the logfile. """)
+    parser.add_argument("--molecule", default = '', metavar = '<str>',
+            help = """Include molecule name in the plot. """)
     args = parser.parse_args()
 
     if args.motifs:
@@ -230,18 +260,19 @@ def main():
                 [l, r] = [int(x) for x in bp.split('-')]
                 mot.append((l, r))
             motifs.append((name, mot))
-        xydata, lint, logt = parse_drf_motifs(sys.stdin, motifs)
+        xydata, lint, logt, tlen = parse_drf_motifs(sys.stdin, motifs)
     else:
         motifs = None
-        xydata, lint, logt = parse_drf(sys.stdin)
+        xydata, lint, logt, tlen = parse_drf(sys.stdin)
 
     if 'gr' in args.formats:
         plot_xmgrace(xydata, args.name + '.gr')
 
     mplf = [f for f in args.formats if f != 'gr']
     if mplf:
-        with plt.style.context('ggplot'):
-            plot_simulation(xydata, args.name, mplf, lint, logt, motifs, title = args.name)
+        with plt.style.context('seaborn-ticks'):
+            plot_simulation(xydata, args.name, mplf, lint, logt, tlen, motifs, 
+                    title = args.molecule)
 
  
 if __name__ == '__main__':

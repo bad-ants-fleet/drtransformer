@@ -124,7 +124,7 @@ def mx_print(A):
     """
     return '\n'.join(' '.join([f'{x:10.4f}' for x in row]) for row in A)
 
-def mx_simulate(A, p0, times, atol = 1e-8, rtol = 1e-12):
+def mx_simulate(A, p0, times, force = None, atol = 1e-8, rtol = 1e-12):
     """ Wrapper function to simulate using matrix exponentials.
 
     Yields:
@@ -135,6 +135,11 @@ def mx_simulate(A, p0, times, atol = 1e-8, rtol = 1e-12):
     drlog.debug(f"Initial occupancy vector ({sum(p0)=}):\n{mx_print([p0])}")
     np.fill_diagonal(A, -np.einsum('ji->j', A))
     drlog.debug(f"Input matrix A including diagonal elements:\n{mx_print(A)}")
+
+    if force is None:
+        force = [times[-1]]
+    elif force[-1] < times[-1]:
+        force.append(times[-1])
 
     last = -1
     try:
@@ -179,7 +184,9 @@ def mx_simulate(A, p0, times, atol = 1e-8, rtol = 1e-12):
             last = t
             if np.allclose(pt, p8): # No need to calculate any more timepoints!
                 drlog.info(f'Equilibrium reached at time {t=}.')
-                yield times[-1], p8
+                for ft in force:
+                    if ft > t:
+                        yield ft, p8
                 return
 
     except MxLinalgError as err:
@@ -194,7 +201,9 @@ def mx_simulate(A, p0, times, atol = 1e-8, rtol = 1e-12):
             yield t, np.absolute(pt/sum(np.absolute(pt)))
             if np.allclose(pt, p8): # No need to calculate any more timepoints!
                 drlog.info(f'Equilibrium reached at time {t=}.')
-                yield times[-1], p8
+                for ft in force:
+                    if ft > t:
+                        yield ft, p8
                 return
     return
 

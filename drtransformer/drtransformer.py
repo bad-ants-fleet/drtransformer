@@ -99,7 +99,7 @@ def parse_drtrafo_args(parser):
             help = "Start transcription at this nucleotide.")
 
     trans.add_argument("--stop", type = int, default = None, metavar = '<int>',
-            help = "Stop transcription before this nucleotide")
+            help = "Stop transcription at this nucleotide")
 
     ###########################
     # DrTransformer algorithm #
@@ -231,7 +231,12 @@ def main():
         _RT = (_RT / 310.15) * kelvin
 
     if args.stop is None:
-        args.stop = len(fullseq) + 1
+        args.stop = len(fullseq)
+    elif args.stop > len(fullseq):
+        raise SystemExit(f'Invalid argument {(args.stop > len(fullseq))=}')
+
+    if not 1 <= args.start <= args.stop:
+        raise SystemExit(f'Invalid argument {(1 <= args.start <= args.stop)=}')
 
     if args.t_end < args.t_ext:
         raise SystemExit('ERROR: Conflicting Settings: ' + \
@@ -342,7 +347,8 @@ def main():
     if args.stdout == 'drf' or dfh:
         # Dictionary to store time course data.
         all_courses = dict()
-        fdata = "id time occupancy structure energy\n"
+        #fdata = "id time occupancy structure energy\n"
+        fdata = "id time conc struct energy\n"
         write_output(fdata, stdout = (args.stdout == 'drf'), fh = dfh)
 
     # Initialize a directed conformation graph
@@ -353,12 +359,12 @@ def main():
     TL.minh = int(round(args.minh*100)) if args.minh else 0
     TL.transcript_length = args.start - 1
 
-    psites = np.full(args.stop - args.start + 1, args.t_ext, dtype = float)
+    psites = np.full(args.stop+1, args.t_ext, dtype = float)
+    #NOTE: psites[0] is useless
     if args.pause_sites:
         for term in args.pause_sites:
             site, pause = term.split('=')
             psites[int(site)] = float(pause)
-    tr_end = sum(psites)
 
     #############
     # ~~~~~~~~~ #
@@ -370,7 +376,7 @@ def main():
     #statprof.start()
 
     time = 0
-    for tlen in range(args.start, args.stop):
+    for tlen in range(args.start, args.stop+1):
         logger.info(f'** Transcription step {tlen} **')
         logger.info(f'Before expansion:      {len(list(TL.active_local_mins)):3d} active lmins, {len(list(TL.active_nodes)):3d} active structures, {len(list(TL.inactive_nodes)):3d} inactive structures.')
         itime = datetime.now()
@@ -389,8 +395,7 @@ def main():
         # Adjust the length of the lin-time simulation:
         t0, t1 = 0, psites[tlen]
         # Adjust the length of the log-time simulation:
-        t8 = t1 + args.t_end if tlen == args.stop - 1 else t1 + sum(psites[tlen+1:])
-
+        t8 = t1 + args.t_end if tlen == args.stop else t1 + sum(psites[tlen+1:])
         if np.isclose(t0, t1) or np.isclose(t1, t8): # only lin or log-part!
             if np.isclose(t1, t8):
                 times = np.array(np.linspace(t0, t1, args.t_lin))
@@ -430,8 +435,8 @@ def main():
             nlist, bbfile, brfile, bofile, callfile = get_tkn_simulation_files(TL, _fname) 
 
         ti, p8, pf = 0, np.zeros(len(p0)), np.zeros(len(p0))
-        for (t, pt) in TL.simulate(snodes, p0, times):
-            if tlen < args.stop - 1 and t > t1:
+        for (t, pt) in TL.simulate(snodes, p0, times, force=[t1]):
+            if tlen < args.stop and t > t1:
                 # NOTE: this is extra time to determine whether structures will
                 # become important in the time frame of transcription.
                 pf = np.maximum(pf, pt)
