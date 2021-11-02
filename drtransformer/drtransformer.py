@@ -87,7 +87,7 @@ def parse_drtrafo_args(parser):
             help = """Transcription speed, i.e. time per nucleotide extension
             [seconds per nucleotide].""")
 
-    trans.add_argument("--t-end", type = float, default = 60, metavar = '<flt>',
+    trans.add_argument("--t-end", type = float, default = 3600, metavar = '<flt>',
             help = "Post-transcriptional simulation time [seconds].")
 
     trans.add_argument("--pause-sites", nargs='+', metavar='<int>=<flt>',
@@ -104,7 +104,7 @@ def parse_drtrafo_args(parser):
     ###########################
     # DrTransformer algorithm #
     ###########################
-    algo.add_argument("--o-prune", type = restricted_float, default = 0.1, metavar = '<flt>',
+    algo.add_argument("--o-prune", type = restricted_float, default = 0.01, metavar = '<flt>',
             help = """Occupancy threshold to prune structures from the 
             network. The structures with lowest occupancy are removed until
             at most o-prune occupancy has been removed from the total population. """)
@@ -179,17 +179,16 @@ def main():
     # ~~~~~~~~~~~~~
     # Logging Setup 
     # ~~~~~~~~~~~~~
-    title = 'DrTransformer: RNA folding kinetics during transcription.'
+    title = f'DrTransformer-v{__version__}: RNA folding kinetics during transcription.'
     logger = logging.getLogger('drtransformer')
     logger.setLevel(logging.DEBUG)
 
-    banner = "{} {}".format(title, __version__)
     ch = logging.StreamHandler()
     formatter = logging.Formatter('# %(levelname)s - %(message)s')
     set_handle_verbosity(ch, args.verbose)
     ch.setFormatter(formatter)
     logger.addHandler(ch)
-    logger.info(banner)
+    logger.info(title)
 
     (name, fullseq) = parse_vienna_stdin(sys.stdin, chars='ACGUNacgun')
 
@@ -347,8 +346,7 @@ def main():
     if args.stdout == 'drf' or dfh:
         # Dictionary to store time course data.
         all_courses = dict()
-        #fdata = "id time occupancy structure energy\n"
-        fdata = "id time conc struct energy\n"
+        fdata = "id time occupancy structure energy\n"
         write_output(fdata, stdout = (args.stdout == 'drf'), fh = dfh)
 
     # Initialize a directed conformation graph
@@ -489,7 +487,7 @@ def main():
         if args.o_prune > 0:
             delth = args.delth
             pn, dn = TL.prune(args.o_prune, delth, keep) 
-            logger.info(f'After pruning:         {len(list(TL.active_local_mins)):3d} active lmins, {len(list(TL.active_nodes)):3d} active structures, {len(list(TL.inactive_nodes)):3d} inactive structures.' +
+            logger.info(f'After pruning:         {len(list(TL.active_local_mins)):3d} active lmins, {len(list(TL.active_nodes)):3d} active structures, {len(list(TL.inactive_nodes)):3d} inactive structures.\n' +
                     f' (Pruned {len(pn)} nodes with combined occupancy below {args.o_prune:.2f}, kept {len(keep)} nodes due to lookahead, deleted {len(dn)} nodes inactive for {delth} transcription steps.)')
 
         ptime = datetime.now()
@@ -508,9 +506,10 @@ def main():
         pe = TL.get_equilibrium_occupancies(snodes)
         fdata  = "# Distribution of structures at the end:\n"
         fdata += "#         {}\n".format(TL.transcript)
+        lnodes, pX = TL.get_occupancies()
         if args.plot_minh:
             for e, node in enumerate(snodes):
-                if node not in plot_cgm:
+                if node not in plot_cgm: #TODO check about lnodes
                     continue
                 ne = TL.nodes[node]['energy']/100
                 no = p8[e] + sum(p8[snodes.index(n)]/len(mapping[n]) for n in plot_cgm[node])
@@ -522,7 +521,9 @@ def main():
                 fdata += f"{tlen:4d} {e+1:4d} {node[:tlen]} {ne:6.2f} {no:6.4f} (eq: {eo:6.4f}) ID = {ni}\n"
             write_output(fdata, stdout = (args.stdout == 'log'), fh = lfh)
         else:
-            for e, node in enumerate(sorted(TL.active_local_mins, key = lambda x: TL.nodes[x]['energy'])):
+            for e, node in enumerate(snodes):
+                if node not in lnodes:
+                    continue
                 ne = TL.nodes[node]['energy']/100
                 no = p8[e]
                 eo = pe[e]

@@ -349,7 +349,7 @@ class TrafoLandscape:
     def get_occupancies(self):
         snodes = sorted(self.active_local_mins, key = lambda x: self.nodes[x]['energy'])
         p0 = [self.nodes[n]['occupancy'] for n in snodes]
-        assert np.isclose(sum(p0), 1)
+        #assert np.isclose(sum(p0), 1)
         return snodes, p0
         
     def get_equilibrium_occupancies(self, snodes):

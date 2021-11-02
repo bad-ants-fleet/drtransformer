@@ -13,7 +13,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from . import __version__
-from .utils import make_pair_table, make_loop_index
+from RNA import ptable
 
 def plot_simulation(trajectories, basename, formats, 
                     lin_time, log_time, tlen = None, motifs = None, title = ''):
@@ -66,19 +66,13 @@ def plot_simulation(trajectories, basename, formats,
 
     # Plot the data.
     if motifs:
-        lw = {'pp': 2, 'pm': .5, 'mm': 1}
-        dh = {'pp': '-', 'pm': ':', 'mm': '--'}
-        zo = {'pp': 1,   'pm': 2,    'mm': 3}
         for i, (name, _) in enumerate(motifs):
-            for suffix in ['pp', 'pm', 'mm']:
-                line = trajectories[f'{name}-{suffix}']
-                t, o = list(zip(*line))
-                if max(o) >= 0.1:
-                    p, = ax1.plot(t, o, dh[suffix], lw=lw[suffix], 
-                                 color = f'C{i}', zorder = zo[suffix])
-                    l, = ax2.plot(t, o, dh[suffix], lw=lw[suffix], 
-                                    color = f'C{i}', zorder = zo[suffix])
-                    l.set_label(f'{name}-{suffix}')
+            line = trajectories[f'{name}']
+            t, o = list(zip(*line))
+            (lw, dh, zo) = (2, '-', 1) if max(o) >= 0.01 else (1, '--', 3)
+            p, = ax1.plot(t, o, dh, lw=lw, color = f'C{i}', zorder = zo)
+            l, = ax2.plot(t, o, dh, lw=lw, color = f'C{i}', zorder = zo)
+            l.set_label(f'{name}')
 
     else:
         for ni in sorted(trajectories):
@@ -111,39 +105,6 @@ def plot_simulation(trajectories, basename, formats,
         plt.savefig(pfile, bbox_inches = 'tight')
     return
 
-def motif_finder(ss, motif):
-    pt = make_pair_table(ss, base = 1)
-    li = make_loop_index(ss)
-
-    # for each base-pair, check if it is
-    # contained or possible.
-    found = 0
-    exact = True
-    for (l, r) in motif:
-        assert l < r
-        # check if incompatible
-        if r > pt[0]:
-            exact = False
-            if l > pt[0]:
-                return 'mm' # incompatible
-            elif li[l-1] != 0:
-                return 'mm' # incompatible
-            else:
-                pass # at most compatible
-        else:
-            if li[l-1] != li[r-1]:
-                return 'mm' # incompatible
-            elif pt[l] == r and pt[r] == l:
-                found += 1
-            else:
-                exact = False
-    if exact:
-        return 'pp' # present
-    elif found > 2:
-        return 'pm' # compatible
-    else:
-        return 'mm' # incompatible
-
 def plot_xmgrace(trajectories, filename):
     """Plot trajectories into a file in grace format.
     """
@@ -171,37 +132,6 @@ def plot_xmgrace(trajectories, filename):
             gfh.write("&\n")
     return
 
-def parse_drf_motifs(stream, motifs):
-    xydata = {}
-    for (name, m) in motifs:
-        xydata[f'{name}-pp'] = [[0, 0]] # present
-        xydata[f'{name}-pm'] = [[0, 0]] # compatible
-        xydata[f'{name}-mm'] = [[0, 1]] # incompatible
-    time_len = []
-    llen, lint, ltime, lltime = 0, 0, '0', '0'
-    for e, line in enumerate(stream):
-        if e == 0:
-            continue
-        [idx, stime, occu, ss, en] = line.split()
-        time = float(stime)
-        occu = float(occu)
-        for (name, m) in motifs:
-            if stime != ltime: # Initialzie all possibilities to 0
-                xydata[f'{name}-pp'].append([time, 0])
-                xydata[f'{name}-pm'].append([time, 0])
-                xydata[f'{name}-mm'].append([time, 0])
-            suffix = motif_finder(ss, m) # none, true, false?
-            xydata[f'{name}-{suffix}'][-1][1] += occu
-        if len(ss) > llen:
-            llen = len(ss)
-            lint = float(lltime)
-            time_len.append((float(lltime), len(ss)))
-        if ltime != stime:
-            ltime = stime
-            lltime = ltime
-    logt = time if time > lint + 60 else lint + 60
-    return xydata, lint, logt, time_len
-
 def parse_drf(stream):
     xydata = {}
     time_len = []
@@ -223,6 +153,71 @@ def parse_drf(stream):
     logt = time if time > lint + 60 else lint + 60
     return xydata, lint, logt, time_len
 
+def parse_drf_motifs(stream, motifs):
+    xydata = {}
+    for (name, m) in motifs:
+        xydata[f'{name}'] = [[0, 0]] 
+    time_len = []
+    llen, lint, ltime, lltime = 0, 0, '0', '0'
+    for e, line in enumerate(stream):
+        if e == 0:
+            continue
+        [idx, stime, occu, ss, en] = line.split()
+        time = float(stime)
+        occu = float(occu)
+        for (name, m) in motifs:
+            if stime != ltime: # Initialzie all possibilities to 0
+                xydata[f'{name}'].append([time, 0])
+            if motif_finder(ss, m):
+                xydata[f'{name}'][-1][1] += occu
+        if len(ss) > llen:
+            llen = len(ss)
+            lint = float(lltime)
+            time_len.append((float(lltime), len(ss)))
+        if ltime != stime:
+            ltime = stime
+            lltime = ltime
+    logt = time if time > lint + 60 else lint + 60
+    return xydata, lint, logt, time_len
+
+def get_motifs(mfile, mstrings):
+    motifs = dict()
+
+    def dbr_to_motif(dbr):
+        pt = ptable(dbr)
+        motP = [(i, j) for i, j in enumerate(pt) if i and i < j]
+        motA = [i for i, j in enumerate(dbr, 1) if j == 'x']
+        return (motP, motA)
+
+    if mfile:
+        with open(mfile, 'r') as mf:
+            for line in mf:
+                if line[0] == '#':
+                    continue
+                dbr, name = line.split()
+                if name in motifs:
+                    raise SystemExit(f"Motif '{name}' is specified multiple times.")
+                motif = dbr_to_motif(dbr) 
+                motifs[name] = motif
+    if mstrings:
+        mstrings = mstrings.split(':')
+        for e, bpl in enumerate(mstrings):
+            name, bpl = bpl.split('=')
+            if name in motifs:
+                raise SystemExit(f"Motif '{name}' is specified multiple times.")
+            motif = [tuple(int(x) for x in bp.split('-')) for bp in bpl.split(',')]
+            motP = [tup for tup in motif if len(tup) == 2]
+            motA = [tup[0] for tup in motif if len(tup) == 1]
+            motifs[name] = (motP, motA)
+    return motifs
+
+def motif_finder(ss, motif):
+    pt = ptable(ss)
+    try:
+        return all(pt[i] == j for (i, j) in motif[0]) and all(pt[i] == 0 for i in motif[1])
+    except IndexError:
+        return False
+
 def main():
     """ DrPlotter -- visulization of cotranscriptional folding simulations.
     """
@@ -238,28 +233,27 @@ def main():
     parser.add_argument("-n", "--name", default = 'DrPlotter', metavar = '<str>',
             help = """Name your output files, name the header of your plots, etc.
             this option overwrites the fasta-header.""")
-    parser.add_argument("-m", "--motifs", default = None, metavar = '<str>',
-            help = """Specify motifs using base-pairs m1=5-15,6-14:m2=5-81""")
+    parser.add_argument("--molecule", default = '', metavar = '<str>',
+            help = """Include molecule name in the plot. """)
     parser.add_argument("-f", "--formats", nargs = '+', default = ['pdf'],
             choices = ('pdf', 'svg', 'png', 'gr', 'eps'),
             help = """Plot the simulation using matplotlib (pdf, svg, png)
             and/or write an input file for xmgrace (gr). The legend uses 
             the identities of structures as specifed in the logfile. """)
-    parser.add_argument("--molecule", default = '', metavar = '<str>',
-            help = """Include molecule name in the plot. """)
+    parser.add_argument("-m", "--motifs", nargs = '+', default = None, metavar = '<str>',
+            help = """Specify motifs using base-pairs m1=5-15,6-14:m2=5-81""")
+    parser.add_argument("--motiffile", default = None, metavar = '<str>',
+            help = """Specify motifs in a file using dot-bracket notation.""")
+    parser.add_argument("--motifstrings", default = None, metavar = '<str>',
+            help = """Specify base-pair motifs on the commandline: m1=5-15,6-14:m2=5-81""")
     args = parser.parse_args()
 
     if args.motifs:
-        motifs = []
-        mstrings = args.motifs.split(':')
-        for e, bpl in enumerate(mstrings):
-            mot = []
-            name, bpl = bpl.split('=')
-            bps = bpl.split(',')
-            for bp in bps:
-                [l, r] = [int(x) for x in bp.split('-')]
-                mot.append((l, r))
-            motifs.append((name, mot))
+        motifd = get_motifs(args.motiffile, args.motifstrings)
+        for n in args.motifs:
+            if n not in motifd:
+                raise SystemExit(f"Motif '{n}' not specified.")
+        motifs = [(n, motifd[n]) for n in args.motifs]
         xydata, lint, logt, tlen = parse_drf_motifs(sys.stdin, motifs)
     else:
         motifs = None
@@ -268,6 +262,8 @@ def main():
     if 'gr' in args.formats:
         plot_xmgrace(xydata, args.name + '.gr')
 
+    if not args.molecule and args.name != 'DrPlotter':
+        args.molecule = args.name
     mplf = [f for f in args.formats if f != 'gr']
     if mplf:
         with plt.style.context('seaborn-ticks'):

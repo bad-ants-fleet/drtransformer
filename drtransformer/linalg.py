@@ -74,8 +74,8 @@ def mx_symmetrize(A, p8):
 
     Args:
         A (np.array): A numpy matrix with entries A[i][j] containing the rate
-            constant for reaction j<-i. (Note that this is the transpose of the
-            "original" rate matrix.)
+            constant for reaction j<-i. (Note that this is the typical form of
+            a Markov matrix and the transpose of the "original" rate matrix.)
         p8 (np.array): The equilibrium distribution vector.
 
     Returns:
