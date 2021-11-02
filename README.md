@@ -90,9 +90,9 @@ dominant, but not on the time scale simulated here. (Can you repeat the analysis
 to see how much time it needs until Pa and Pb dominate the ensemble?)
 
 <img src="examples/DCBAmod-motifs.png" alt="DCBAmod"/><br>
-As shown in the publication, a single point mutation in DCBA, here DCBAmod is
-sufficient to drastically shift the balance between Pa/Pb and Pc/Pd containing 
-structures.
+As shown in the publication, a single point mutation (from DCBA to DCBAmod) is
+sufficient to drastically shift occupancy between Pa/Pb and Pc/Pd containing 
+structures at the end of transcription.
 
 ### Tips and tricks
  - The header of the logfile contains all relevant DrTransformer parameters that generated the file. 
