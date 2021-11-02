@@ -102,7 +102,13 @@ structures.
  - Motifs for DrPlotter can also contain 'x' in the dot-bracket notation for *must be unpaired*.
 
 ## Version
-v0.9 -- standalone package
+v0.10 -- moved to beta status (first official release)
+  * changes in parameter defaults 
+  * bugfix in linalg
+  * new DrPlotter simulation layout and motif plotting
+  * repaired code to enable plotting including pause sites
+
+v0.9 -- standalone package (no official release)
   * extraction from the [ribolands] package to a standalone Python package.
   * using scipy and numpy for matrix exponentials (instead of [treekin])
   * implemented lookahead to skip pruning of potentially relevant future structures

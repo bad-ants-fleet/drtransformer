@@ -6,7 +6,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name = 'drtransformer',
-    version = '0.9',
+    version = '0.10',
     description = 'Heuristic cotranscriptional folding using the nearest neighbor energy model.',
     long_description = LONG_DESCRIPTION,
     long_description_content_type = 'text/markdown',
@@ -17,7 +17,7 @@ setup(
     url = 'https://github.com/bad-ants-fleet/drtransformer',
     license = 'ViennaRNA',
     classifiers = [
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 4 - Beta',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
         'Intended Audience :: Science/Research',

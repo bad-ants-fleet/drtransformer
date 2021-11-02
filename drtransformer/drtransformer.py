@@ -6,9 +6,7 @@ import logging
 import os, sys, argparse
 import math
 import numpy as np
-
-# Debugging only
-from datetime import datetime
+from datetime import datetime # Performance report 
 
 import RNA
 from . import __version__
@@ -59,20 +57,20 @@ def parse_drtrafo_args(parser):
             help = """Write verbose information to a file:
             {--outdir}/{--name}.log""")
 
-    output.add_argument("--tmpdir", default = '', action = 'store', metavar = '<str>',
-            help = """Specify path for storing landscape files for debugging. These
-            files will not be removed when the program terminates. """)
-
     output.add_argument("--outdir", default = '', action = 'store', metavar = '<str>',
             help = """Place regular output files, into this directory. Creates
             the directory if it does not exist. """)
+
+    output.add_argument("--tmpdir", default = '', action = 'store', metavar = '<str>',
+            help = """Specify path for storing landscape files for debugging. These
+            files will not be removed when the program terminates. """)
 
     output.add_argument("--no-timecourse", action = "store_true",
             help = """Do not produce the time-course file (outdir/name.drf).""")
 
     output.add_argument("--plot-minh", type = float, default = None, metavar = '<flt>',
             help = """Coarsify the output based on a minimum barrier height. In contrast
-            to t-fast, this does *not* speed up the simulation.""")
+            to t-fast, this does *not* affect the accuracy of the model.""")
 
     output.add_argument("--t-lin", type = int, default = 30, metavar = '<int>',
             help = """Evenly space output *--t-lin* times during transcription on a linear time scale.""")
@@ -80,11 +78,15 @@ def parse_drtrafo_args(parser):
     output.add_argument("--t-log", type = int, default = 300, metavar = '<int>',
             help = """Evenly space output *--t-log* times after transcription on a logarithmic time scale.""")
 
+    output.add_argument("--performance-report", action = "store_true", 
+            # prints datetimes and statprof data for performance analysis
+            help = argparse.SUPPRESS)
+
     ############################
     # Transcription parameters #
     ############################
     trans.add_argument("--t-ext", type = float, default = 0.02, metavar = '<flt>',
-            help = """Transcription speed, i.e. time per nucleotide extension
+            help = """Inverse of transcription rate, i.e. time per nucleotide extension
             [seconds per nucleotide].""")
 
     trans.add_argument("--t-end", type = float, default = 3600, metavar = '<flt>',
@@ -127,14 +129,14 @@ def parse_drtrafo_args(parser):
     algo.add_argument("--fpwm", type = int, default = 4, metavar = '<int>',
             help = """Findpath search width multiplier. This value times the
             base-pair distance results in the findpath search width. Higher
-            values increase the chances to find energetically better transition
-            state energies.""")
+            values increase the chances to find energetically lower saddle
+            energies for the transition. """)
 
     algo.add_argument("--mfree", type = int, default = 6, metavar = '<int>',
             help = """Minimum number of freed bases during helix fraying.
             Fraying helices can vary greatly in length, starting with at
             least two base-pairs. This parameter defines the minimum amount of
-            bases freed by helix fraying. For example, 6 corresponds to a
+            bases freed by helix fraying. For example, 6 can correspond to a
             stack of two base-pairs and a loop region of 2 nucleotides. If less
             bases are freed and there exists a nested stacked helix, this helix
             is considered to fray as well.""")
@@ -370,8 +372,9 @@ def main():
     # ~~~~~~~~~ #
     #############
 
-    #import statprof
-    #statprof.start()
+    if args.performance_report:
+        import statprof
+        statprof.start()
 
     time = 0
     for tlen in range(args.start, args.stop+1):
@@ -380,7 +383,7 @@ def main():
         itime = datetime.now()
 
         # Get new nodes and connect them.
-        nn, on = TL.expand()
+        nn, on, prep = TL.expand(args.performance_report)
         logger.info(f'After expansion:                         {len(list(TL.active_nodes)):3d} active structures, {len(list(TL.inactive_nodes)):3d} inactive structures.' +
                     f' (Found {len(nn)} new nodes and revisited {len(on)} pruned nodes.)')
         etime = datetime.now()
@@ -487,19 +490,21 @@ def main():
         if args.o_prune > 0:
             delth = args.delth
             pn, dn = TL.prune(args.o_prune, delth, keep) 
-            logger.info(f'After pruning:         {len(list(TL.active_local_mins)):3d} active lmins, {len(list(TL.active_nodes)):3d} active structures, {len(list(TL.inactive_nodes)):3d} inactive structures.\n' +
-                    f' (Pruned {len(pn)} nodes with combined occupancy below {args.o_prune:.2f}, kept {len(keep)} nodes due to lookahead, deleted {len(dn)} nodes inactive for {delth} transcription steps.)')
+            logger.info(f'After pruning:         {len(list(TL.active_local_mins)):3d} active lmins,' + 
+                        f' {len(list(TL.active_nodes)):3d} active structures, {len(list(TL.inactive_nodes)):3d} inactive structures.' +
+                        f' (Pruned {len(pn)} nodes, kept {len(keep)} nodes due to lookahead, deleted {len(dn)} inactive nodes.)')
 
         ptime = datetime.now()
-        if args.verbose:
-            exptime = (etime - itime).total_seconds() 
-            cgntime = (ctime - etime).total_seconds()
-            simtime = (stime - ctime).total_seconds()
-            prntime = (ptime - stime).total_seconds()
-            tottime = (ptime - itime).total_seconds()
-            logger.info(f'{tlen=}, {tottime=}, {exptime=}, {cgntime=}, {simtime=}, {prntime=}.')
-            #print(tlen, tottime, exptime, cgntime, simtime, prntime)
-            #sys.stdout.flush()
+        exptime = (etime - itime).total_seconds() 
+        cgntime = (ctime - etime).total_seconds()
+        simtime = (stime - ctime).total_seconds()
+        prntime = (ptime - stime).total_seconds()
+        tottime = (ptime - itime).total_seconds()
+        logger.info(f'{tlen=}, {tottime=}, {exptime=}, {cgntime=}, {simtime=}, {prntime=}.')
+        if args.performance_report:
+            (exptime, frayytime, guidetime, floodtime) = prep
+            print(tlen, tottime, frayytime, guidetime, floodtime, exptime, cgntime, simtime, prntime)
+            sys.stdout.flush()
 
     # Write the last results
     if args.stdout == 'log' or lfh:
@@ -509,7 +514,9 @@ def main():
         lnodes, pX = TL.get_occupancies()
         if args.plot_minh:
             for e, node in enumerate(snodes):
-                if node not in plot_cgm: #TODO check about lnodes
+                if node not in lnodes:
+                    continue
+                if node not in plot_cgm:
                     continue
                 ne = TL.nodes[node]['energy']/100
                 no = p8[e] + sum(p8[snodes.index(n)]/len(mapping[n]) for n in plot_cgm[node])
@@ -518,7 +525,7 @@ def main():
                 nids = [TL.nodes[n]['identity'] for n in sorted(plot_cgm[node], key = lambda x: TL.nodes[x]['identity'])]
                 if nids:
                     ni +=  f" + {' + '.join(nids)}"
-                fdata += f"{tlen:4d} {e+1:4d} {node[:tlen]} {ne:6.2f} {no:6.4f} (eq: {eo:6.4f}) ID = {ni}\n"
+                fdata += f"{tlen:4d} {e+1:4d} {node[:tlen]} {ne:6.2f} {no:6.4f} [-\u221e-> {eo:6.4f}] ID = {ni}\n"
             write_output(fdata, stdout = (args.stdout == 'log'), fh = lfh)
         else:
             for e, node in enumerate(snodes):
@@ -531,12 +538,14 @@ def main():
                 fdata += f"{tlen:4d} {e:4d} {node[:tlen]} {ne:6.2f} {no:6.4f} [-\u221e-> {eo:6.4f}] ID = {ni}\n"
             write_output(fdata, stdout=(args.stdout == 'log'), fh = lfh)
 
-    #statprof.stop()
-    #statprof.display()
-
     # CLEANUP file handles
     if lfh: lfh.close()
     if dfh: dfh.close()
+
+    if args.performance_report:
+        statprof.stop()
+        statprof.display()
+
     return
 
 if __name__ == '__main__':

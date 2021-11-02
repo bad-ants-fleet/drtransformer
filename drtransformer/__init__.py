@@ -7,7 +7,7 @@
 # See README for instructions.
 #
 
-__version__ = "0.9"
+__version__ = "0.10"
 
 _MIN_VRNA_VERSION = "2.4.13"
 

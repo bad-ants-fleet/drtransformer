@@ -179,7 +179,7 @@ class TrafoLandscape:
     # Algorithmic part #
     # ================ #
 
-    def expand(self):
+    def expand(self, performance_report = False):
         """ Find new secondary structures and determine their neighborhood in the landscape.
 
         The function adds to types of new structures: 
@@ -210,6 +210,7 @@ class TrafoLandscape:
             self.addnode(mfess, structure = mfess, occupancy = 1)
             nn = set([mfess])
             on = set()
+            pr = (0, 0, 0, 0) if performance_report else None
         else: 
             md = self.md
             fpwm = self.fpwm
@@ -286,9 +287,9 @@ class TrafoLandscape:
             guidetime = (g_time - f_time).total_seconds()
             floodtime = (l_time - g_time).total_seconds()
             tottime = (l_time - i_time).total_seconds()
-            #print(len(seq), tottime, frayytime, guidetime, floodtime)
-            #sys.stdout.flush()
-        return nn, on
+            drlog.debug(f'{len(seq)=}, {tottime=}, {frayytime=}, {guidetime=}, {floodtime=}.')
+            pr = (tottime, frayytime, guidetime, floodtime) if performance_report else None
+        return nn, on, pr
 
     def get_coarse_network(self):
         """ Produce a smaller graph of local minima and best connections.

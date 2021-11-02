@@ -53,7 +53,7 @@ def get_p8_detbal(A):
                 else:
                     p8[j] = p8[i] * (A[i][j] / A[j][i])
                     count += 1
-                assert 0 <= p8[j] <= p8[0], "unreasonable equilibrium occupancy in p8"
+                assert 0 <= p8[j] <= p8[0] or np.isclose(p8[j], p8[0]), f"unreasonable equilibrium occupancy in p8: {j}, {p8[j]}"
         # Given i, we have looped through all j
         done[i] = 1
         # Determine next i for solving
@@ -144,7 +144,7 @@ def mx_simulate(A, p0, times, force = None, atol = 1e-8, rtol = 1e-12):
     last = -1
     try:
         p8 = get_p8_detbal(A)
-        drlog.info(f"Equilibrium distribution vector p8 ({sum(p8)=}):\n{mx_print([p8])}")
+        drlog.debug(f"Equilibrium distribution vector p8 ({sum(p8)=}):\n{mx_print([p8])}")
         if not all(p > 0 for p in p8): 
             raise MxLinalgError(f"Negative elements in p8 ({p8=})")
 
@@ -183,24 +183,24 @@ def mx_simulate(A, p0, times, force = None, atol = 1e-8, rtol = 1e-12):
             yield t, np.absolute(pt/sum(np.absolute(pt)))
             last = t
             if np.allclose(pt, p8): # No need to calculate any more timepoints!
-                drlog.info(f'Equilibrium reached at time {t=}.')
+                drlog.debug(f'Equilibrium reached at time {t=}.')
                 for ft in force:
                     if ft > t:
                         yield ft, p8
                 return
 
     except MxLinalgError as err:
-        drlog.info(f"Exception due to Error: {str(err)}")
-        R = R.T
+        drlog.debug(f"Exception due to Error: {str(err)}")
+        A = A.T
         for t in times:
             if t <= last:
                 continue
-            pt = sl.expm(R * t).dot(p0)
+            pt = sl.expm(A * t).dot(p0)
             if not np.isclose(sum(pt), 1., rtol = rtol, atol = atol):
                 raise MxLinalgError('Unstable simulation at time {t=}: {sum(pt)=}')
             yield t, np.absolute(pt/sum(np.absolute(pt)))
             if np.allclose(pt, p8): # No need to calculate any more timepoints!
-                drlog.info(f'Equilibrium reached at time {t=}.')
+                drlog.debug(f'Equilibrium reached at time {t=}.')
                 for ft in force:
                     if ft > t:
                         yield ft, p8
