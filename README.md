@@ -121,10 +121,10 @@ Badelt et al. (in preparation)
 [ribolands]: <https://github.com/bad-ants-fleet/ribolands>
 [treekin]: <https://github.com/ViennaRNA/Treekin>
 [Xayaphoummine et al. (2006)]: <https://doi.org/10.1093/nar/gkl1036>
-[`examples/`]: <https://github.com/ViennaRNA/ViennaRNA>
-[`ABCD.fa`]: <https://github.com/ViennaRNA/ViennaRNA>
-[`DCBA.fa`]: <https://github.com/ViennaRNA/ViennaRNA>
-[`DCBAmod.fa`]: <https://github.com/ViennaRNA/ViennaRNA>
-[`ABCD.motifs`]: <https://github.com/ViennaRNA/ViennaRNA>
-[`DCBA.motifs`]: <https://github.com/ViennaRNA/ViennaRNA>
-[`DCBAmod.motifs`]: <https://github.com/ViennaRNA/ViennaRNA>
+[`examples/`]: <https://github.com/bad-ants-fleet/drtransformer/tree/master/examples>
+[`ABCD.fa`]: <https://github.com/bad-ants-fleet/drtransformer/blob/master/examples/ABCD.fa>
+[`DCBA.fa`]: <https://github.com/bad-ants-fleet/drtransformer/blob/master/examples/DCBA.fa>
+[`DCBAmod.fa`]: <https://github.com/bad-ants-fleet/drtransformer/blob/master/examples/DCBAmod.fa>
+[`ABCD.motifs`]: <https://github.com/bad-ants-fleet/drtransformer/blob/master/examples/ABCD.motifs>
+[`DCBA.motifs`]: <https://github.com/bad-ants-fleet/drtransformer/blob/master/examples/DCBA.motifs>
+[`DCBAmod.motifs`]: <https://github.com/bad-ants-fleet/drtransformer/blob/master/examples/DCBAmod.motifs>
