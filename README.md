@@ -2,7 +2,8 @@
 
 DrTransformer (short for "DNA-to-RNA transformer") is a program for heuristic
 and deterministic cotranscriptional folding simulations of RNA molecules. The
-software uses the [ViennaRNA] package which is available through the [ViennaRNA
+code of this project is available under [MIT license], however this software
+depends on the [ViennaRNA] package which is available through the [ViennaRNA
 license].
 
 ## Installation
@@ -114,7 +115,9 @@ v0.9 -- standalone package (no official release)
   * implemented lookahead to skip pruning of potentially relevant future structures
 
 ## License
-Same as the [ViennaRNA license]. 
+The code of this project is available under [MIT license], however this
+software depends on the [ViennaRNA] package which is available through the
+[ViennaRNA license].
 
 ## Cite
 Badelt et al. (in preparation)

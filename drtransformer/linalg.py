@@ -18,73 +18,71 @@ from itertools import combinations
 class MxLinalgError(Exception):
     pass
 
-def get_p8_detbal(A):
+def get_p8_detbal(R):
     """ Calculate the equilibrium distribution vector "p8".
 
-    Given a the rate matrix A, calculate the equilibrium distribution vector
+    Given a the rate matrix R, calculate the equilibrium distribution vector
     "p8" using detailed balance: P_i k_{ij} = P_j k_{ji}.
 
     Args:
-        A: A numpy matrix with entries A[i][j] containing the rate constant for
-            reaction i->j. 
+        A: A numpy matrix with entries R[i][j] containing the rate constant for
+            reaction j->i. 
 
     WARNING: This function requires a matrix with ZERO entries. Do not use it
-    with numerical result matrices where some A[i][j] may be "almost" zero.
+    with numerical result matrices where some R[i][j] may be "almost" zero.
 
     Returns:
         [np.array] The equilbrium distribution vector p8.
     """
-    dim = len(A)
+    dim = len(R)
     p8 = np.zeros(dim, dtype=np.float64)
     p8[0] = 1.
 
-    i, count = 0, 1  # current index, number of solved states
+    j, count = 0, 1  # current index, number of solved states
     done = np.zeros(dim, dtype=int)
     while (count != dim):
         # Rewrite entries of p8
-        for j in range(dim):
+        for i in range(dim):
             if i == j:
                 continue
-            if A[i][j] != 0 or A[j][i] != 0:
-                assert A[i][j] > 0 and A[j][i] > 0, "unbalanced matrix"
-                if p8[j] > 0:
-                    p8[j] += p8[i] * (A[i][j] / A[j][i])
-                    p8[j] /= 2
+            if R[i][j] != 0 or R[j][i] != 0:
+                assert R[i][j] > 0 and R[j][i] > 0, "unbalanced matrix"
+                if p8[i] > 0:
+                    p8[i] += p8[j] * (R[i][j] / R[j][i])
+                    p8[i] /= 2
                 else:
-                    p8[j] = p8[i] * (A[i][j] / A[j][i])
+                    p8[i] = p8[j] * (R[i][j] / R[j][i])
                     count += 1
-                assert 0 <= p8[j] <= p8[0] or np.isclose(p8[j], p8[0]), f"unreasonable equilibrium occupancy in p8: {j}, {p8[j]}"
-        # Given i, we have looped through all j
-        done[i] = 1
-        # Determine next i for solving
+                assert 0 <= p8[i] <= p8[0] or np.isclose(p8[i], p8[0]), f"unreasonable equilibrium occupancy in p8: {i}, {p8[i]}"
+        # Given j, we have looped through all i
+        done[j] = 1
+        # Determine next j for solving
         for c, p in enumerate(p8):
             if not done[c] and p > 0:
-                i = c
+                j = c
                 break
-        assert not (i == dim and count < dim), "non-ergodic chain!"
+        assert not (j == dim and count < dim), "non-ergodic chain!"
     return p8 / sum(p8) # make the vector sum = 1.0
 
-def mx_symmetrize(A, p8):
+def mx_symmetrize(R, p8):
     """ Symmetrize a rate matrix by using its equilibrium distribution.
 
     Generating a symmetric matrix U throught the following formula:
-        U = _sqrtP8 * A * sqrtP8_ 
-    where _sqrtP8 and sqrtP8 are diagonal matrices constructed from the 
-    equilibrium distribution vector.
+        U = Omega^{-1} * R * Omega
+    where Omega is a diagonal matrix constructed from the equilibrium
+    distribution vector.
 
     Args:
-        A (np.array): A numpy matrix with entries A[i][j] containing the rate
-            constant for reaction j<-i. (Note that this is the typical form of
-            a Markov matrix and the transpose of the "original" rate matrix.)
+        R (np.array): The rate matrix of the form R_{ij} = {k_{ji}, k_{ii} = -sum_j k_{ij}}.
         p8 (np.array): The equilibrium distribution vector.
 
     Returns:
-        U, _sqrP8, sqrP8_
+        Omega, U, Omega^{-1}
     """
-    dim = len(A)
-    _sqrtP8 = np.diag(1/np.sqrt(p8))
-    sqrtP8_ = np.diag(np.sqrt(p8))
-    U = np.matmul(np.matmul(_sqrtP8, A), sqrtP8_)
+    dim = len(R)
+    _sqrtP8 = np.diag(1/np.sqrt(p8)) # OmegaInv
+    sqrtP8_ = np.diag(np.sqrt(p8))   # Omega
+    U = np.matmul(np.matmul(_sqrtP8, R), sqrtP8_)
 
     # force correction of numerical errors
     err = 0
@@ -93,7 +91,7 @@ def mx_symmetrize(A, p8):
         U[i][j] = (U[i][j] + U[j][i]) / 2
         U[j][i] = U[i][j]
     drlog.debug(f'Corrected numerical error: {err} ({err/(dim*dim-dim)} per number).')
-    return U, _sqrtP8, sqrtP8_
+    return sqrtP8_, U, _sqrtP8
 
 def mx_decompose_sym(U):
     """ Decompose a symmetric matrix into eigenvectors and eigenvalues.
@@ -124,17 +122,23 @@ def mx_print(A):
     """
     return '\n'.join(' '.join([f'{x:10.4f}' for x in row]) for row in A)
 
-def mx_simulate(A, p0, times, force = None, atol = 1e-8, rtol = 1e-12):
+def mx_simulate(R, p0, times, force = None, atol = 1e-8, rtol = 1e-12):
     """ Wrapper function to simulate using matrix exponentials.
+
+    Args:
+        R: The rate matrix of the form R_{ij} = {k_{ji}, k_{ii} = -sum_j k_{ij}},
+            where the diagonal may also be empty.
 
     Yields:
         t, pt: The time and the population vector.
     """
-    dim = len(A)
+    dim = len(R)
 
     drlog.debug(f"Initial occupancy vector ({sum(p0)=}):\n{mx_print([p0])}")
-    np.fill_diagonal(A, -np.einsum('ji->j', A))
-    drlog.debug(f"Input matrix A including diagonal elements:\n{mx_print(A)}")
+    if R[0][0] == 0:
+        drlog.debug(f"Adding diagonal elements to rate matrix.")
+        np.fill_diagonal(R, -np.einsum('ij->j', R))
+    drlog.debug(f"Input matrix R including diagonal elements:\n{mx_print(R)}")
 
     if force is None:
         force = [times[-1]]
@@ -143,16 +147,18 @@ def mx_simulate(A, p0, times, force = None, atol = 1e-8, rtol = 1e-12):
 
     last = -1
     try:
-        p8 = get_p8_detbal(A)
+        p8 = get_p8_detbal(R)
         drlog.debug(f"Equilibrium distribution vector p8 ({sum(p8)=}):\n{mx_print([p8])}")
         if not all(p > 0 for p in p8): 
             raise MxLinalgError(f"Negative elements in p8 ({p8=})")
 
-        drlog.debug(f"\nSolving: U = _P8 * A^T * P8_\n")
-        U, _P, P_= mx_symmetrize(A.T, p8)
+        drlog.debug(f"\nSolving: U = _P8 * R * P8_\n")
+        O_, U, _O = mx_symmetrize(R, p8)
+        if not np.allclose(np.matmul(O_, _O), np.identity(dim), atol = atol, rtol = rtol): 
+            raise MxLinalgError(f"O_ * _O != I")
         drlog.debug("Symmetrized matrix U:\n" + mx_print(U))
-        drlog.debug("1 / sqrt(P8) matrix:\n" + mx_print(_P))
-        drlog.debug("sqrt(P8):\n" + mx_print(P_))
+        drlog.debug("1 / sqrt(P8) matrix:\n" + mx_print(_O))
+        drlog.debug("sqrt(P8):\n" + mx_print(O_))
 
         drlog.debug(f"\nDecomposing: U = _S * L * S_\n")
         _S, L, S_ = mx_decompose_sym(U)
@@ -160,11 +166,11 @@ def mx_simulate(A, p0, times, force = None, atol = 1e-8, rtol = 1e-12):
         drlog.debug("Eigenvectors _S:\n" + mx_print(_S))
         drlog.debug("Eigenvectors S_:\n" + mx_print(S_)) # It's just the transpose of _S!
  
-        CL = np.matmul(P_, _S)
-        drlog.debug("Left correction matrix CL:\n" + mx_print(CL))
+        CL = np.matmul(O_, _S)
+        drlog.debug("Left correction matrix CL = O_ * _S:\n" + mx_print(CL))
 
-        CR = np.matmul(S_, _P)
-        drlog.debug("Right correction matrix CR:\n" + mx_print(CR))
+        CR = np.matmul(S_, _O)
+        drlog.debug("Right correction matrix CR = S_ * _O :\n" + mx_print(CR))
 
         drlog.debug("CL * CR:\n" + mx_print(np.matmul(CL, CR)))
         if not np.allclose(np.matmul(CL, CR), np.identity(dim), atol = atol, rtol = rtol): 
@@ -172,9 +178,6 @@ def mx_simulate(A, p0, times, force = None, atol = 1e-8, rtol = 1e-12):
 
         tV = CR.dot(p0)
         drlog.debug(f"Correction vector tV ({sum(tV)=}):\n{mx_print([tV])}")
-        if not np.allclose(tV, S_.dot(_P.dot(p0))):
-            raise MxLinalgError(f"Numerical problems with tV.")
-
         for t in times:
             eLt = np.diag(np.exp(L*t))
             pt = CL.dot(eLt.dot(tV))
@@ -191,11 +194,10 @@ def mx_simulate(A, p0, times, force = None, atol = 1e-8, rtol = 1e-12):
 
     except MxLinalgError as err:
         drlog.debug(f"Exception due to Error: {str(err)}")
-        A = A.T
         for t in times:
             if t <= last:
                 continue
-            pt = sl.expm(A * t).dot(p0)
+            pt = sl.expm(R * t).dot(p0)
             if not np.isclose(sum(pt), 1., rtol = rtol, atol = atol):
                 raise MxLinalgError('Unstable simulation at time {t=}: {sum(pt)=}')
             yield t, np.absolute(pt/sum(np.absolute(pt)))
@@ -222,7 +224,11 @@ def main():
             help = """Track process using verbose output.""")
 
     parser.add_argument("-r", "--rate-matrix", default=None, nargs='?', metavar='<str>', 
-            help = "Path to the input file containing the rate matrix (A[i][j] = i -> j).")
+            help = "Path to the input file containing the rate matrix (R[i][j] = rate j -> i)!")
+
+    parser.add_argument("--transpose", action = "store_true",
+            help = """Convenience funtion to transpose the rate matrix if it is in
+            the wrog format (for compatibility with treekin).""")
 
     parser.add_argument("--p0", nargs='+', metavar='<int/str>=<flt>', required=True,
             help="""Vector of initial species occupancies. 
@@ -282,10 +288,12 @@ def main():
     times = np.concatenate([lin_times, log_times])
 
     # Parse matrix input.
-    A = np.loadtxt(args.rate_matrix, dtype=np.float64)
+    R = np.loadtxt(args.rate_matrix, dtype=np.float64)
+    if args.transpose:
+        R = R.T
 
     # Parse p0 input.
-    p0 = np.zeros(len(A), dtype = np.float64)
+    p0 = np.zeros(len(R), dtype = np.float64)
     for term in args.p0:
         p, o = term.split('=')
         p0[int(p) - 1] = float(o)
@@ -293,7 +301,7 @@ def main():
 
     # NOTE: a good point to assert ergodicity.
 
-    for t, pt in mx_simulate(A, p0, times):
+    for t, pt in mx_simulate(R, p0, times):
         print(f"{t:8.6e} {' '.join([f'{x:8.6e}' for x in abs(pt)])}")
 
 if __name__ == '__main__':
