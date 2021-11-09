@@ -228,7 +228,7 @@ def main():
 
     parser.add_argument("--transpose", action = "store_true",
             help = """Convenience funtion to transpose the rate matrix if it is in
-            the wrog format (for compatibility with treekin).""")
+            the wrong format (for compatibility with treekin).""")
 
     parser.add_argument("--p0", nargs='+', metavar='<int/str>=<flt>', required=True,
             help="""Vector of initial species occupancies. 

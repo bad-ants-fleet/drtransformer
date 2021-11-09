@@ -33,7 +33,7 @@ in the subfolder [`examples/`], in particular the three files [`ABCD.fa`],
 [`DCBA.fa`] and [`DCBAmod.fa`]. Those files contain only a fasta header and the
 respective sequence from the publication.
 ```sh
-  ~$ cat ABCD.fa | DrTransformer --name ABCD --logfile 
+  ~$ cat ABCD.fa | DrTransformer --name ABCD --o-prune 0.01 --logfile 
 ```
 The above command line call of DrTransformer produced two files:
  - `ABCD.log` contains a human-readable summary of the cotranscriptional folding process. 
@@ -117,7 +117,7 @@ v0.9 -- standalone package (no official release)
 ## License
 The code of this project is available under [MIT license], however this
 software depends on the [ViennaRNA] package which is available through the
-[ViennaRNA license].
+[ViennaRNA license], which is more restricted with respect to commertial use. 
 
 ## Cite
 Badelt et al. (in preparation)
@@ -130,10 +130,10 @@ Badelt et al. (in preparation)
 [ribolands]: <https://github.com/bad-ants-fleet/ribolands>
 [treekin]: <https://github.com/ViennaRNA/Treekin>
 [Xayaphoummine et al. (2006)]: <https://doi.org/10.1093/nar/gkl1036>
-[`examples/`]: <https://github.com/bad-ants-fleet/drtransformer/tree/master/examples>
-[`ABCD.fa`]: <https://github.com/bad-ants-fleet/drtransformer/blob/master/examples/ABCD.fa>
-[`DCBA.fa`]: <https://github.com/bad-ants-fleet/drtransformer/blob/master/examples/DCBA.fa>
-[`DCBAmod.fa`]: <https://github.com/bad-ants-fleet/drtransformer/blob/master/examples/DCBAmod.fa>
-[`ABCD.motifs`]: <https://github.com/bad-ants-fleet/drtransformer/blob/master/examples/ABCD.motifs>
-[`DCBA.motifs`]: <https://github.com/bad-ants-fleet/drtransformer/blob/master/examples/DCBA.motifs>
-[`DCBAmod.motifs`]: <https://github.com/bad-ants-fleet/drtransformer/blob/master/examples/DCBAmod.motifs>
+[`examples/`]: <examples>
+[`ABCD.fa`]: <examples/ABCD.fa>
+[`DCBA.fa`]: <examples/DCBA.fa>
+[`DCBAmod.fa`]: <examples/DCBAmod.fa>
+[`ABCD.motifs`]: <examples/ABCD.motifs>
+[`DCBA.motifs`]: <examples/DCBA.motifs>
+[`DCBAmod.motifs`]: <examples/DCBAmod.motifs>
