@@ -1023,6 +1023,7 @@ def top_down_coarse_graining_exe():
     md.dangles = args.dangles
     md.special_hp = not args.noTetra
     md.logML = 0
+    md.noLP = 1
     md.noGU = args.noGU
     md.noGUclosure = args.noClosingGU
 
@@ -1037,6 +1038,10 @@ def top_down_coarse_graining_exe():
         if l[0]:
             en = int(round(float(l[1])*100)) if len(l) > 1 else None
             ndata[l[0]] = {'energy': en}
+            if len(l) > 2:
+                ndata[l[0]]['occupancy'] = float(l[2]) 
+            else:
+                print('debug')
         else:
             print(f'Troubles with input line {e+1} {line=}')
 
@@ -1067,7 +1072,10 @@ def top_down_coarse_graining_exe():
                 edata[(x,y)] = {'saddle_energy': None}
     else:
         print('Neighborhood flooding ...')
-        ndata, edata = neighborhood_flooding((seq, md), ndata, gedges, minh = args.minh)
+        ndata, edata = neighborhood_flooding((seq, md, 4), ndata, gedges, minh = args.minh)
+
+    for x in ndata:
+        ndata[x]['occupancy'] = ndata[x].get('occupancy', 0)
 
     if args.minh:
         print(f'Top down coarse graining with {args.minh=} ({len(ndata)=}, {len(edata)=}).')
@@ -1078,4 +1086,17 @@ def top_down_coarse_graining_exe():
         cgn, cge, cgm = ndata, edata, {n:[] for n in ndata}
     print('Total hidden nodes:', sum(len(cgm[n]) for n in cgn))
     print(as_barfile(seq, cgn, cge, cgm))
+
+    mapping = {n: set() for n in ndata}
+    for lmin, hidden in cgm.items():
+        assert lmin in ndata
+        for hn in hidden:
+            assert hn in ndata
+            assert 'occupancy' in ndata[hn]
+            mapping[hn].add(lmin)
+            
+    p0 = np.zeros(len(cgn))
+    for e, x in enumerate(sorted(cgn, key = lambda x:ndata[x]['energy'])):
+        p0[e] = ndata[x]['occupancy'] + sum(ndata[h]['occupancy']/len(mapping[h]) for h in cgm[x])
+    print(p0, sum(p0))
 
