@@ -1,9 +1,6 @@
 #
 # /drtransformer/__init__.py
 #
-# Distributed under the same license as the ViennaRNA package:
-# https://github.com/ViennaRNA/ViennaRNA
-#
 # See README for instructions.
 #
 

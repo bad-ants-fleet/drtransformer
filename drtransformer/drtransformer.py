@@ -106,7 +106,7 @@ def parse_drtrafo_args(parser):
     ###########################
     # DrTransformer algorithm #
     ###########################
-    algo.add_argument("--o-prune", type = restricted_float, default = 0.01, metavar = '<flt>',
+    algo.add_argument("--o-prune", type = restricted_float, default = 0.05, metavar = '<flt>',
             help = """Occupancy threshold to prune structures from the 
             network. The structures with lowest occupancy are removed until
             at most o-prune occupancy has been removed from the total population. """)
@@ -463,6 +463,12 @@ def main():
         keep = [n for e, n in enumerate(snodes) if pf[e] > args.o_prune] if args.o_prune else []
         TL.set_occupancies(snodes, p8)
         time += ti
+
+        # NOTE: just for debugging, check if p8 is calculated correctly.
+        #tlp8 = TL.get_equilibrium_occupancies(snodes)
+        #Z = sum(math.e**(-TL.nodes[n]['energy']/100/_RT) for n in snodes)
+        #myp8 = np.array([math.e**(-TL.nodes[n]['energy']/100/_RT)/Z for n in snodes])
+        #assert np.allclose(tlp8, myp8)
 
         # ~~~~~~~~~~~~~~~~~~~~~~~~~ #
         # Output simulation results #

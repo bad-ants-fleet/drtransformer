@@ -15,7 +15,7 @@ setup(
     maintainer = 'Stefan Badelt',
     maintainer_email = 'bad-ants-fleet@posteo.eu',
     url = 'https://github.com/bad-ants-fleet/drtransformer',
-    license = 'ViennaRNA',
+    license = 'MIT',
     classifiers = [
         'Development Status :: 4 - Beta',
         'Programming Language :: Python :: 3.8',
@@ -35,7 +35,7 @@ setup(
             'DrPlotter=drtransformer.plotting:main',
             'DrFindpath=drtransformer.rnafolding:call_findpath_exe',
             'DrCoarseGrain=drtransformer.rnafolding:top_down_coarse_graining_exe',
-            'DrSimlate=drtransformer.linalg:main',
+            'DrSimulate=drtransformer.linalg:main',
             ],
         }
 )

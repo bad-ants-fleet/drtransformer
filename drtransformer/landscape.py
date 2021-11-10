@@ -359,7 +359,7 @@ class TrafoLandscape:
         for i, ni in enumerate(snodes):
             for j, nj in enumerate(snodes):
                 if self.has_cg_edge(ni, nj):
-                    R[i][j] = self.cg_edges[(ni, nj)]['weight']
+                    R[j][i] = self.cg_edges[(ni, nj)]['weight']
         return get_p8_detbal(R)
  
     def set_occupancies(self, snodes, pt):
@@ -384,7 +384,7 @@ class TrafoLandscape:
         for i, ni in enumerate(snodes):
             for j, nj in enumerate(snodes):
                 if self.has_cg_edge(ni, nj):
-                    R[i][j] = self.cg_edges[(ni, nj)]['weight']
+                    R[j][i] = self.cg_edges[(ni, nj)]['weight']
 
         for t, pt in mx_simulate(R, p0, times, force = force, atol = atol, rtol = rtol):
             yield t, pt
@@ -432,9 +432,7 @@ class TrafoLandscape:
 
         for lm in new_inactive_lms:
             assert not self.nodes[lm]['active']
-            # TODO: should it really be all of them?
             self.nodes[lm]['occtransfer'] = set(get_active_nbrs(lm))
-            #print('occu', lm, '->',  self.nodes[lm]['occtransfer'])
             assert len(self.nodes[lm]['occtransfer']) > 0
 
         pn = set()
