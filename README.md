@@ -2,7 +2,7 @@
 
 DrTransformer (short for "DNA-to-RNA transformer") is a program for heuristic
 and deterministic cotranscriptional folding simulations of RNA molecules. The
-code of this project is available under [MIT license], however this software
+code of this project is available under MIT license, however this software
 depends on the [ViennaRNA] package which is available through the [ViennaRNA
 license].
 
@@ -12,11 +12,20 @@ license].
   ~$ python -m pytest tests/ -v -s
 ```
 
-### ViennaRNA dependencies
+### ViennaRNA dependency
 This package uses the [ViennaRNA] library. Generally, every official release of
 DrTransformer should be compatible with the latest [ViennaRNA bioconda] version.
 For features available only on the development branches, you may have to install
 a more recent version from the [ViennaRNA source] on Github.
+
+Note that installing the latest version of the ViennaRNA package via conda 
+requires to use **both** the `bioconda` and the `conda-forge` channels.
+
+```sh
+  ~$ conda config --add channels bioconda
+  ~$ conda config --add channels conda-forge
+  ~$ conda install viennarna
+```
 
 ## Usage
 Until further documentation is available, please use the *--help* options of the 
@@ -115,7 +124,7 @@ v0.9 -- standalone package (no official release)
   * implemented lookahead to skip pruning of potentially relevant future structures
 
 ## License
-The code of this project is available under [MIT license], however this
+The code of this project is available under MIT license, however this
 software depends on the [ViennaRNA] package which is available through the
 [ViennaRNA license], which is more restricted with respect to commertial use. 
 
