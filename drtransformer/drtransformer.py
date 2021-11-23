@@ -33,6 +33,7 @@ def parse_drtrafo_args(parser):
     ###################
     parser.add_argument('--version', action = 'version', 
             version = '%(prog)s ' + __version__)
+
     parser.add_argument("-v", "--verbose", action = 'count', default = 0,
             help = """Track process by writing verbose output to STDOUT during
             calculations. Use --logfile if you want to see *just* verbose
@@ -147,7 +148,7 @@ def parse_drtrafo_args(parser):
     algo.add_argument("--k0", type = float, default = 2e5, metavar = '<flt>',
             help = """Arrhenius rate constant (pre-exponential factor). Adjust
             this constant of the Arrhenius equation to relate free energy
-            changes to experimentally determined folding time [seconds].""")
+            changes to experimentally determined folding time [atu/sec].""")
     return
 
 def write_output(data, stdout = False, fh = None):
@@ -486,7 +487,8 @@ def main():
                                                                      key = lambda x: TL.nodes[x]['identity'])]
                     if lmins:
                         ni +=  f" -> {', '.join(lmins)}"
-                fdata = f"{tlen:4d} {e+1:4d} {node[:tlen]} {ne:6.2f} [{po:6.4f} -> {no:6.4f}] ID = {ni}\n"
+                ax = ' ' if np.isclose(po, no, atol=1e-4) else '+' if no > po else '-'
+                fdata = f"{tlen:4d} {e+1:4d} {node[:tlen]} {ne:6.2f} {ax}[{po:6.4f} -> {no:6.4f}] ID = {ni}\n"
                 write_output(fdata, stdout = (args.stdout == 'log'), fh = lfh)
         stime = datetime.now()
 
@@ -519,11 +521,7 @@ def main():
         fdata += "#         {}\n".format(TL.transcript)
         lnodes, pX = TL.get_occupancies()
         if args.plot_minh:
-            for e, node in enumerate(snodes):
-                if node not in lnodes:
-                    continue
-                if node not in plot_cgm:
-                    continue
+            for e, node in enumerate([s for s in snodes if s in plot_cgm]):
                 ne = TL.nodes[node]['energy']/100
                 no = p8[e] + sum(p8[snodes.index(n)]/len(mapping[n]) for n in plot_cgm[node])
                 eo = pe[e] + sum(pe[snodes.index(n)]/len(mapping[n]) for n in plot_cgm[node])
@@ -531,17 +529,17 @@ def main():
                 nids = [TL.nodes[n]['identity'] for n in sorted(plot_cgm[node], key = lambda x: TL.nodes[x]['identity'])]
                 if nids:
                     ni +=  f" + {' + '.join(nids)}"
-                fdata += f"{tlen:4d} {e+1:4d} {node[:tlen]} {ne:6.2f} {no:6.4f} [-\u221e-> {eo:6.4f}] ID = {ni}\n"
+                ax = ' ' if np.isclose(no, eo, atol=1e-4) else '+' if eo > no else '-'
+                fdata += f"{tlen:4d} {e+1:4d} {node[:tlen]} {ne:6.2f} {no:6.4f} {ax}[t8: {eo:6.4f}] ID = {ni}\n"
             write_output(fdata, stdout = (args.stdout == 'log'), fh = lfh)
         else:
             for e, node in enumerate(snodes):
-                if node not in lnodes:
-                    continue
                 ne = TL.nodes[node]['energy']/100
                 no = p8[e]
                 eo = pe[e]
                 ni = TL.nodes[node]['identity']
-                fdata += f"{tlen:4d} {e:4d} {node[:tlen]} {ne:6.2f} {no:6.4f} [-\u221e-> {eo:6.4f}] ID = {ni}\n"
+                ax = ' ' if np.isclose(no, eo, atol=1e-4) else '+' if eo > no else '-'
+                fdata += f"{tlen:4d} {e+1:4d} {node[:tlen]} {ne:6.2f} {no:6.4f} {ax}[t8: {eo:6.4f}] ID = {ni}\n"
             write_output(fdata, stdout=(args.stdout == 'log'), fh = lfh)
 
     # CLEANUP file handles
