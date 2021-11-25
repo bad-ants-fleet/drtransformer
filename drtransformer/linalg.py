@@ -3,7 +3,7 @@
 # drtransformer.linalg
 # 
 # Calculate matrix exponentials using numpy and scipy.
-# Most of this code is inpired by the program treekin:
+# Most of this code is inspired by the program treekin:
 #  https://www.tbi.univie.ac.at/RNA/Treekin/ 
 #
 
@@ -21,7 +21,7 @@ class MxLinalgError(Exception):
 def get_p8_detbal(R):
     """ Calculate the equilibrium distribution vector "p8".
 
-    Given a the rate matrix R, calculate the equilibrium distribution vector
+    Given rate matrix R, calculate the equilibrium distribution vector
     "p8" using detailed balance: P_i k_{ij} = P_j k_{ji}.
 
     Args:
@@ -32,7 +32,7 @@ def get_p8_detbal(R):
     with numerical result matrices where some R[i][j] may be "almost" zero.
 
     Returns:
-        [np.array] The equilbrium distribution vector p8.
+        [np.array] The equilibrium distribution vector p8.
     """
     dim = len(R)
     p8 = np.zeros(dim, dtype=np.float64)
@@ -53,7 +53,8 @@ def get_p8_detbal(R):
                 else:
                     p8[i] = p8[j] * (R[i][j] / R[j][i])
                     count += 1
-                assert 0 <= p8[i] <= p8[0] or np.isclose(p8[i], p8[0]), f"unreasonable equilibrium occupancy in p8: {i}, {p8[i]}"
+                if not (0 <= p8[i] <= p8[0] or np.isclose(p8[i], p8[0])):
+                    drlog.info(f"Species {i} is dominant at equilibrium ({p8[0] = }, p8[{i}] = {p8[i]}).")
         # Given j, we have looped through all i
         done[j] = 1
         # Determine next j for solving
@@ -67,7 +68,7 @@ def get_p8_detbal(R):
 def mx_symmetrize(R, p8):
     """ Symmetrize a rate matrix by using its equilibrium distribution.
 
-    Generating a symmetric matrix U throught the following formula:
+    Generating a symmetric matrix U through the following formula:
         U = Omega^{-1} * R * Omega
     where Omega is a diagonal matrix constructed from the equilibrium
     distribution vector.
@@ -135,9 +136,16 @@ def mx_simulate(R, p0, times, force = None, atol = 1e-8, rtol = 1e-12):
     dim = len(R)
 
     drlog.debug(f"Initial occupancy vector ({sum(p0)=}):\n{mx_print([p0])}")
-    if R[0][0] == 0:
-        drlog.debug(f"Adding diagonal elements to rate matrix.")
-        np.fill_diagonal(R, -np.einsum('ij->j', R))
+
+    # NOTE: To avoid confusion, always overwrite the diagonal! 
+    olddiag = np.array(R.diagonal())
+    np.fill_diagonal(R, 0)
+    np.fill_diagonal(R, -np.einsum('ij->j', R))
+    if not np.allclose(olddiag, R.diagonal()):
+        drlog.info(f'Matrix diagonal overwritten! {olddiag} vs {R.diagonal()}')
+        if not (np.allclose(0, olddiag) or np.allclose(1, olddiag-R.diagonal())):
+            drlog.warning(f'**WARNING**: Something is weird about your previous diagonal, does this message disappear when you use --transpose?')
+
     drlog.debug(f"Input matrix R including diagonal elements:\n{mx_print(R)}")
 
     if force is None:
@@ -181,11 +189,11 @@ def mx_simulate(R, p0, times, force = None, atol = 1e-8, rtol = 1e-12):
         for t in times:
             eLt = np.diag(np.exp(L*t))
             pt = CL.dot(eLt.dot(tV))
-            if not np.isclose(sum(pt), 1., rtol = rtol, atol = atol):
-                raise MxLinalgError('Unstable simulation at time {t=}: {sum(pt)=}')
+            if not np.isclose(sum(pt), 1., atol = atol, rtol = rtol):
+                raise MxLinalgError(f'Unstable simulation at time {t=}: {sum(pt)=}')
             yield t, np.absolute(pt/sum(np.absolute(pt)))
             last = t
-            if np.allclose(pt, p8): # No need to calculate any more timepoints!
+            if np.allclose(pt, p8): # No need to calculate any more time points!
                 drlog.debug(f'Equilibrium reached at time {t=}.')
                 for ft in force:
                     if ft > t:
@@ -198,10 +206,10 @@ def mx_simulate(R, p0, times, force = None, atol = 1e-8, rtol = 1e-12):
             if t <= last:
                 continue
             pt = sl.expm(R * t).dot(p0)
-            if not np.isclose(sum(pt), 1., rtol = rtol, atol = atol):
-                raise MxLinalgError('Unstable simulation at time {t=}: {sum(pt)=}')
+            if not np.isclose(sum(pt), 1., atol = atol, rtol = rtol):
+                raise MxLinalgError(f'Unstable simulation at time {t=}: {sum(pt)=}')
             yield t, np.absolute(pt/sum(np.absolute(pt)))
-            if np.allclose(pt, p8): # No need to calculate any more timepoints!
+            if np.allclose(pt, p8): # No need to calculate any more time points!
                 drlog.debug(f'Equilibrium reached at time {t=}.')
                 for ft in force:
                     if ft > t:
@@ -227,8 +235,8 @@ def main():
             help = "Path to the input file containing the rate matrix (R[i][j] = rate j -> i)!")
 
     parser.add_argument("--transpose", action = "store_true",
-            help = """Convenience funtion to transpose the rate matrix if it is in
-            the wrong format (for compatibility with treekin).""")
+            help = """Convenience function to transpose the rate matrix if needed
+            (for compatibility with treekin).""")
 
     parser.add_argument("--p0", nargs='+', metavar='<int/str>=<flt>', required=True,
             help="""Vector of initial species occupancies. 
@@ -249,6 +257,12 @@ def main():
 
     parser.add_argument("--t8", type = float, default = 1e5, metavar = '<flt>',
             help = """Give t8.""")
+ 
+    parser.add_argument("--atol", type = float, default = 1e-8, metavar = '<flt>',
+            help = """Absolute tolerance for numerical errors.""")
+
+    parser.add_argument("--rtol", type = float, default = 1e-12, metavar = '<flt>',
+            help = """Relative tolerance for numerical errors.""")
 
     args = parser.parse_args()
 
@@ -291,7 +305,7 @@ def main():
     R = np.loadtxt(args.rate_matrix, dtype=np.float64)
     if args.transpose:
         R = R.T
-
+    
     # Parse p0 input.
     p0 = np.zeros(len(R), dtype = np.float64)
     for term in args.p0:
@@ -301,7 +315,7 @@ def main():
 
     # NOTE: a good point to assert ergodicity.
 
-    for t, pt in mx_simulate(R, p0, times):
+    for t, pt in mx_simulate(R, p0, times, atol = args.atol, rtol = args.rtol):
         print(f"{t:8.6e} {' '.join([f'{x:8.6e}' for x in abs(pt)])}")
 
 if __name__ == '__main__':
