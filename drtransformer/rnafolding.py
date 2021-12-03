@@ -1013,9 +1013,10 @@ def top_down_coarse_graining_exe():
     parser = argparse.ArgumentParser()
     parser.add_argument("-v", "--verbose", action='count', default = 0,
             help = """Track process using verbose output.""")
-    parser.add_argument("--minh", type = int, default = None,
-            metavar = '<int>',
-            help = "Set a minimum barrier height for path flooding.")
+    parser.add_argument("--minh", type = float, default = None, metavar = '<float>',
+            help = "Set a minimum barrier height for path flooding (kcal/mol).")
+    parser.add_argument("-w","--search-width-multiplier", type = int, default = 4, 
+            help = "Adjust upper bound for findpath search.")
     parser.add_argument("-e", "--elementary-moves", action = "store_true",
             help = "Elementary base-pair moves only.")
     parse_model_details(parser)
@@ -1030,6 +1031,8 @@ def top_down_coarse_graining_exe():
     md.noGU = args.noGU
     md.noGUclosure = args.noClosingGU
     md.noLP = args.noLP #NOTE: findpath/flooding cannot do noLP!
+    fpwm = args.search_width_multiplier
+    minh = None if not args.minh else int(round(args.minh*100))
 
     # Parsing RNAsubopt-like file.
     seq = None
@@ -1045,24 +1048,25 @@ def top_down_coarse_graining_exe():
         else:
             print(f'Troubles with input line {e+1} {line=}')
 
-    print(seq)
     fc = RNA.fold_compound(seq, md)
     for ss in ndata:
         if ndata[ss]['energy'] is None:
             ndata[ss]['energy'] = int(round(fc.eval_structure(ss) * 100))
 
     # Get the guide graph for all inputs:
-    print(f'Guide graph construction with {len(ndata)} structures.')
+    print(f'# Guide graph construction with {len(ndata)} structures.')
     gnodes, gedges = get_guide_graph(seq, md, ndata)
 
     if len(gnodes):
-        print('Some important structures have been included automatically:')
+        print('# Some important structures have been included automatically:')
         for gn in gnodes:
             print(gn[0], gn[1])
             ndata[gn[0]] = {'energy': gn[1]}
 
-    if args.elementary_moves: # Do you want to have a base-pair neighborhood only?
-        print('Using elementary moves only.')
+    if args.elementary_moves: 
+        # Do you want to have a base-pair neighborhood only?
+        # You probably could have gotten that much cheaper!
+        print('# Using elementary moves only.')
         edata = dict()
         for (x, y) in gedges:
             if get_bpd_cache(x, y) == 1:
@@ -1071,16 +1075,16 @@ def top_down_coarse_graining_exe():
             else:
                 edata[(x,y)] = {'saddle_energy': None}
     else:
-        print('Neighborhood flooding ...')
-        ndata, edata = neighborhood_flooding((seq, md), ndata, gedges, minh = args.minh)
+        print('# Neighborhood flooding ...')
+        ndata, edata = neighborhood_flooding((seq, md, fpwm), ndata, gedges, minh = minh)
 
     if args.minh:
-        print(f'Top down coarse graining with {args.minh=} ({len(ndata)=}, {len(edata)=}).')
+        print(f'# Top down coarse graining with {args.minh=} ({len(ndata)=}, {len(edata)=}).')
         edata = {k: v for k, v in edata.items() if v['saddle_energy'] is not None}
-        cgn, cge, cgm = top_down_coarse_graining(ndata, edata, minh = args.minh)
+        cgn, cge, cgm = top_down_coarse_graining(ndata, edata, minh = minh)
     else:
-        print(f'No coarse graining.')
+        print(f'# No coarse graining.')
         cgn, cge, cgm = ndata, edata, {n:[] for n in ndata}
-    print('Total hidden nodes:', sum(len(cgm[n]) for n in cgn))
+    print('# Total hidden nodes:', sum(len(cgm[n]) for n in cgn))
     print(as_barfile(seq, cgn, cge, cgm))
 
