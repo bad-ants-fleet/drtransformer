@@ -241,7 +241,7 @@ def main():
             and/or write an input file for xmgrace (gr). The legend uses 
             the identities of structures as specifed in the logfile. """)
     parser.add_argument("-m", "--motifs", nargs = '+', default = None, metavar = '<str>',
-            help = """Specify motifs using base-pairs m1=5-15,6-14:m2=5-81""")
+            help = """Select specific motif names for plotting. The motifs must be defined via the motiffile or motifstrings options.""")
     parser.add_argument("--motiffile", default = None, metavar = '<str>',
             help = """Specify motifs in a file using dot-bracket notation.""")
     parser.add_argument("--motifstrings", default = None, metavar = '<str>',

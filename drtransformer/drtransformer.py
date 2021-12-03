@@ -304,7 +304,7 @@ def main():
 
     # Set model details.
     vrna_md = RNA.md()
-    vrna_md.noLP = 1
+    vrna_md.noLP = args.noLP #NOTE: findpath/flooding cannot do noLP!
     vrna_md.logML = 0
     vrna_md.temperature = args.temp
     vrna_md.dangles = args.dangles
@@ -357,7 +357,7 @@ def main():
     TL.k0 = args.k0
     TL.fpwm = args.fpwm
     TL.mfree = args.mfree
-    TL.minh = int(round(args.minh*100)) if args.minh else 0
+    TL.minh = 0 if not args.minh else int(round(args.minh*100))
     TL.transcript_length = args.start - 1
 
     psites = np.full(args.stop+1, args.t_ext, dtype = float)
