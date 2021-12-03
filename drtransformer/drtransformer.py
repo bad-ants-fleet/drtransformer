@@ -70,14 +70,17 @@ def parse_drtrafo_args(parser):
             help = """Do not produce the time-course file (outdir/name.drf).""")
 
     output.add_argument("--plot-minh", type = float, default = None, metavar = '<flt>',
-            help = """Coarsify the output based on a minimum barrier height. In contrast
-            to t-fast, this does *not* affect the accuracy of the model.""")
+            help = """Coarsify the output based on a minimum barrier height. In
+            contrast to t-fast, this does *not* affect the accuracy of the
+            model.""")
 
     output.add_argument("--t-lin", type = int, default = 30, metavar = '<int>',
-            help = """Evenly space output *--t-lin* times during transcription on a linear time scale.""")
+            help = """Evenly space output *--t-lin* times during transcription
+            on a linear time scale.""")
 
     output.add_argument("--t-log", type = int, default = 300, metavar = '<int>',
-            help = """Evenly space output *--t-log* times after transcription on a logarithmic time scale.""")
+            help = """Evenly space output *--t-log* times after transcription
+            on a logarithmic time scale.""")
 
     output.add_argument("--performance-report", action = "store_true", 
             # prints datetimes and statprof data for performance analysis
@@ -107,7 +110,8 @@ def parse_drtrafo_args(parser):
     ###########################
     # DrTransformer algorithm #
     ###########################
-    algo.add_argument("--o-prune", type = restricted_float, default = 0.05, metavar = '<flt>',
+    algo.add_argument("--o-prune", type = restricted_float, default = 0.05, 
+            metavar = '<flt>',
             help = """Occupancy threshold to prune structures from the 
             network. The structures with lowest occupancy are removed until
             at most o-prune occupancy has been removed from the total population. """)
@@ -214,6 +218,22 @@ def main():
     else:
         filepath = args.name
 
+    if args.performance_report:
+        #import statprof
+        #statprof.start()
+        if not args.logfile:
+            logger.warning(f'Redirecting logging output to {filepath}.log.')
+            args.logfile = True
+
+        print((f"{'Name':10s} "
+               f"{'t-fast':>7s} {'o-prune':>8s} {'fpwm':>5s} {'mfree':>6s} "
+               f"{'length':>7s} "
+               f"{'lmins':>6s} {'moves':>6s} "
+               f"{'nodes':>6s} {'edges':>6s} "
+               f"{'t_total':>10s} {'t_expand':>10s} "
+               f"{'t_fray':>10s} {'t_guide':>10s} {'t_flood':>10s} "
+               f"{'t_cgrain':>10s} {'t_sim':>10s} {'t_prune':>10s}"))
+
     dfh = open(filepath + '.drf', 'w') if not args.no_timecourse else None
     lfh = open(filepath + '.log', 'w') if args.logfile else None
 
@@ -284,14 +304,16 @@ def main():
         args.t_fast = 1/(args.k0 * math.exp(-args.minh/_RT))
     else:
         args.minh = max(0, -_RT * math.log(1 / args.t_fast / args.k0))
-    logger.info(f'--t-fast: {args.t_fast} s => {args.minh} kcal/mol barrier height ' + 
-                f'and {1/args.t_fast} /s rate at k0 = {args.k0}')
+    logger.info((f'--t-fast: {args.t_fast} s => {args.minh} kcal/mol barrier height '
+                 f'and {1/args.t_fast} /s rate at k0 = {args.k0}'))
 
     if not args.force and args.t_fast and args.t_fast * 10 > args.t_ext:
-        raise SystemExit('ERROR: Conflicting Settings: ' + 
-                'Arguments must be such that "--t-fast" * 10 > "--t-ext".\n' + 
-                '       => An instant folding time must be at least 10x shorter than ' +
-                'the time of nucleotide extension. You may use --force to ignore this setting.')
+        raise SystemExit(
+                ('ERROR: Conflicting Settings: '
+                 'Arguments must be such that "--t-fast" * 10 > "--t-ext".\n'
+                 '       => An instant folding time must be at least 10x '
+                 'shorter than the time of nucleotide extension. '
+                 'You may use --force to ignore this setting.'))
 
     ############################
     # ~~~~~~~~~~~~~~~~~~~~~~~~ #
@@ -373,25 +395,29 @@ def main():
     # ~~~~~~~~~ #
     #############
 
-    if args.performance_report:
-        import statprof
-        statprof.start()
-
     time = 0
     for tlen in range(args.start, args.stop+1):
         logger.info(f'** Transcription step {tlen} **')
-        logger.info(f'Before expansion:      {len(list(TL.active_local_mins)):3d} active lmins, {len(list(TL.active_nodes)):3d} active structures, {len(list(TL.inactive_nodes)):3d} inactive structures.')
+        logger.info((f'Before expansion:      '
+                     f'{len(list(TL.active_local_mins)):3d} active lmins, '
+                     f'{len(list(TL.active_nodes)):3d} active structures, '
+                     f'{len(list(TL.inactive_nodes)):3d} inactive structures.'))
         itime = datetime.now()
 
         # Get new nodes and connect them.
         nn, on, prep = TL.expand(args.performance_report)
-        logger.info(f'After expansion:                         {len(list(TL.active_nodes)):3d} active structures, {len(list(TL.inactive_nodes)):3d} inactive structures.' +
-                    f' (Found {len(nn)} new nodes and revisited {len(on)} pruned nodes.)')
+        logger.info((f'After expansion:                         '
+                     f'{len(list(TL.active_nodes)):3d} active structures, '
+                     f'{len(list(TL.inactive_nodes)):3d} inactive structures. '
+                     f'(Found {len(nn)} new nodes and revisited {len(on)} pruned nodes.)'))
         etime = datetime.now()
 
         cn, ce = TL.get_coarse_network()
-        logger.info(f'After coarse graining: {len(list(TL.active_local_mins)):3d} active lmins, {len(list(TL.active_nodes)):3d} active structures, {len(list(TL.inactive_nodes)):3d} inactive structures.' +
-                    f' (Simulation network size: nodes = {cn}, edges = {ce}.)')
+        logger.info((f'After coarse graining: '
+                     f'{len(list(TL.active_local_mins)):3d} active lmins, '
+                     f'{len(list(TL.active_nodes)):3d} active structures, '
+                     f'{len(list(TL.inactive_nodes)):3d} inactive structures. '
+                     f'(Simulation network size: nodes = {cn}, edges = {ce}.)'))
         ctime = datetime.now()
 
         # Adjust the length of the lin-time simulation:
@@ -498,9 +524,12 @@ def main():
         if args.o_prune > 0:
             delth = args.delth
             pn, dn = TL.prune(args.o_prune, delth, keep) 
-            logger.info(f'After pruning:         {len(list(TL.active_local_mins)):3d} active lmins,' + 
-                        f' {len(list(TL.active_nodes)):3d} active structures, {len(list(TL.inactive_nodes)):3d} inactive structures.' +
-                        f' (Pruned {len(pn)} nodes, kept {len(keep)} nodes due to lookahead, deleted {len(dn)} inactive nodes.)')
+            logger.info((f'After pruning:         '
+                         f'{len(list(TL.active_local_mins)):3d} active lmins, '
+                         f'{len(list(TL.active_nodes)):3d} active structures, '
+                         f'{len(list(TL.inactive_nodes)):3d} inactive structures. '
+                         f'(Pruned {len(pn)} nodes, kept {len(keep)} nodes due to '
+                         f'lookahead, deleted {len(dn)} inactive nodes.)'))
 
         ptime = datetime.now()
         exptime = (etime - itime).total_seconds() 
@@ -510,8 +539,16 @@ def main():
         tottime = (ptime - itime).total_seconds()
         logger.info(f'{tlen=}, {tottime=}, {exptime=}, {cgntime=}, {simtime=}, {prntime=}.')
         if args.performance_report:
-            (exptime, frayytime, guidetime, floodtime) = prep
-            print(tlen, tottime, frayytime, guidetime, floodtime, exptime, cgntime, simtime, prntime)
+            (exptime, fraytime, guidetime, floodtime) = prep
+            print((f"{name:10s} "
+                   f"{args.t_fast:>7.2g} {args.o_prune:>8.2g} "
+                   f"{args.fpwm:>5d} {args.mfree:>6d} "
+                   f"{tlen:7d} "
+                   f'{cn:6d} {ce:6d} '
+                   f'{len(TL.nodes):6d} {len(TL.edges):6d} '
+                   f"{tottime:>10.6f} {exptime:>10.6f} "
+                   f"{fraytime:10.6f} {guidetime:>10.6f} {floodtime:>10.6f} "
+                   f"{cgntime:>10.6f} {simtime:>10.6f} {prntime:>10.6f}"))
             sys.stdout.flush()
 
     # Write the last results
@@ -546,9 +583,9 @@ def main():
     if lfh: lfh.close()
     if dfh: dfh.close()
 
-    if args.performance_report:
-        statprof.stop()
-        statprof.display()
+    #if args.performance_report:
+    #    statprof.stop()
+    #    statprof.display()
 
     return
 

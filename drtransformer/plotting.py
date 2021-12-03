@@ -15,6 +15,19 @@ import matplotlib.pyplot as plt
 from . import __version__
 from RNA import ptable
 
+def plot_profile_df(name):
+    import pandas as pd
+    df = pd.read_csv(name, sep='\s+')
+    #df = df.drop(df[df.cg_bpd >= 20].index)
+
+    df.plot(x='length', y=["t_total", "t_expand", "t_fray", "t_guide", "t_flood"], subplots=False, legend=True)
+    #df.plot(x='length', y=["lmins", "moves", "nodes", "edges"], subplots=False, legend=True)
+    #df.plot(x='length', y=["lmins", "moves"], subplots=False, legend=True)
+
+    #fig = plt.gcf()
+    #fig.set_size_inches(9, 4)
+    plt.savefig(f'{name}.pdf')
+
 def plot_simulation(trajectories, basename, formats, 
                     lin_time, log_time, tlen = None, motifs = None, title = ''):
     """DrTransformer standard plotting function.
@@ -246,7 +259,14 @@ def main():
             help = """Specify motifs in a file using dot-bracket notation.""")
     parser.add_argument("--motifstrings", default = None, metavar = '<str>',
             help = """Specify base-pair motifs on the commandline: m1=5-15,6-14:m2=5-81""")
+    parser.add_argument("--plot-profile", default = '',
+            help = """Provide a file for plotting.""")
+
     args = parser.parse_args()
+
+    if args.plot_profile:
+        plot_profile_df(args.plot_profile)
+        return
 
     if args.motifs:
         motifd = get_motifs(args.motiffile, args.motifstrings)
