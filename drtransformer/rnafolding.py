@@ -42,6 +42,10 @@ def parse_model_details(parser):
     model.add_argument("--noClosingGU", action = "store_true",
         help = 'Do not allow GU/GT pairs at the end of helices.')
 
+    model.add_argument("--noLP", action = "store_true",
+        help = ("Only consider structures without lonely pairs. "
+                "(This is never enforced when estimating energy barriers.)"))
+
     model.add_argument("-P", "--paramFile", action = "store", default = None,
         metavar = '<str>',
         help = """Read energy parameters from paramfile, instead of 
@@ -1025,6 +1029,7 @@ def top_down_coarse_graining_exe():
     md.logML = 0
     md.noGU = args.noGU
     md.noGUclosure = args.noClosingGU
+    md.noLP = args.noLP #NOTE: findpath/flooding cannot do noLP!
 
     # Parsing RNAsubopt-like file.
     seq = None

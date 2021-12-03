@@ -304,7 +304,7 @@ def main():
 
     # Set model details.
     vrna_md = RNA.md()
-    vrna_md.noLP = 1
+    vrna_md.noLP = args.noLP #NOTE: findpath/flooding cannot do noLP!
     vrna_md.logML = 0
     vrna_md.temperature = args.temp
     vrna_md.dangles = args.dangles
