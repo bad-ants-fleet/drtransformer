@@ -6,7 +6,7 @@ import logging
 import os, sys, argparse
 import math
 import numpy as np
-from datetime import datetime # Performance report 
+from datetime import datetime # profiling report 
 
 import RNA
 from . import __version__
@@ -82,8 +82,8 @@ def parse_drtrafo_args(parser):
             help = """Evenly space output *--t-log* times after transcription
             on a logarithmic time scale.""")
 
-    output.add_argument("--performance-report", action = "store_true", 
-            # prints datetimes and statprof data for performance analysis
+    output.add_argument("--profile", action = "store_true", 
+            # prints datetimes and statprof data for profiling analysis
             help = argparse.SUPPRESS)
 
     ############################
@@ -218,7 +218,7 @@ def main():
     else:
         filepath = args.name
 
-    if args.performance_report:
+    if args.profile:
         #import statprof
         #statprof.start()
         if not args.logfile:
@@ -405,7 +405,7 @@ def main():
         itime = datetime.now()
 
         # Get new nodes and connect them.
-        nn, on, prep = TL.expand(args.performance_report)
+        nn, on, prep = TL.expand(args.profile)
         logger.info((f'After expansion:                         '
                      f'{len(list(TL.active_nodes)):3d} active structures, '
                      f'{len(list(TL.inactive_nodes)):3d} inactive structures. '
@@ -538,7 +538,7 @@ def main():
         prntime = (ptime - stime).total_seconds()
         tottime = (ptime - itime).total_seconds()
         logger.info(f'{tlen=}, {tottime=}, {exptime=}, {cgntime=}, {simtime=}, {prntime=}.')
-        if args.performance_report:
+        if args.profile:
             (exptime, fraytime, guidetime, floodtime) = prep
             print((f"{name:10s} "
                    f"{args.t_fast:>7.2g} {args.o_prune:>8.2g} "
@@ -583,7 +583,7 @@ def main():
     if lfh: lfh.close()
     if dfh: dfh.close()
 
-    #if args.performance_report:
+    #if args.profile:
     #    statprof.stop()
     #    statprof.display()
 
