@@ -6,7 +6,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name = 'drtransformer',
-    version = '0.10',
+    version = '0.11',
     description = 'Heuristic cotranscriptional folding using the nearest neighbor energy model.',
     long_description = LONG_DESCRIPTION,
     long_description_content_type = 'text/markdown',
