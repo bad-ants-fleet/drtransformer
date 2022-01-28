@@ -13,10 +13,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from . import __version__
-from RNA import ptable
+from RNA import ptable, loopidx_from_ptable
 
 def plot_simulation(trajectories, basename, formats, 
-                    lin_time, log_time, tlen = None, motifs = None, title = ''):
+                    lin_time, log_time, tlen = None, 
+                    motifs = None, extlen = False, title = ''):
     """DrTransformer standard plotting function.
     """
 
@@ -28,7 +29,8 @@ def plot_simulation(trajectories, basename, formats,
     ax1.set_xscale('linear')
     ax1.spines['right'].set_visible(False)
     ax1.set_xlim((0, lin_time))
-    ax1.set_ylim([-0.02, 1.02])
+    if not extlen:
+        ax1.set_ylim([-0.02, 1.02])
     # Tick business
     xticks = [round(x, 2) for x in np.linspace(0, lin_time, 6)]
     ax1.set_xticks(xticks)
@@ -36,7 +38,8 @@ def plot_simulation(trajectories, basename, formats,
     ax2.set_xscale('log')
     ax2.spines['left'].set_visible(False)
     ax2.set_xlim((lin_time, log_time))
-    ax2.set_ylim([-0.02, 1.02])
+    if not extlen:
+        ax2.set_ylim([-0.02, 1.02])
     # Tick business
     ax2.yaxis.tick_right()
     ax2.set_yticklabels([])
@@ -92,12 +95,16 @@ def plot_simulation(trajectories, basename, formats,
                 l, = ax2.plot(t, o, '-', lw=1)
 
     # Legends and labels.
-    ax1.set_ylabel('occupancy')
+    if extlen:
+        ax1.set_ylabel('exterior loop length')
+    else:
+        ax1.set_ylabel('occupancy')
     ax1.set_xlabel('time (seconds)')
     ax1.xaxis.set_label_coords(0.7, -0.15)
     ax1t.set_xlabel(f'{title} transcript length')
     ax1t.xaxis.set_label_coords(0.7, 1.15)
-    ax2.legend()
+    if not extlen:
+        ax2.legend()
 
     # Save a file.
     for ending in formats:
@@ -180,6 +187,36 @@ def parse_drf_motifs(stream, motifs):
     logt = time if time > lint + 60 else lint + 60
     return xydata, lint, logt, time_len
 
+def parse_drf_extlen(stream, maxlen = False):
+    xydata = {'exterior': [[0, 0]]}
+    time_len = []
+    llen, lint, ltime, lltime = 0, 0, '0', '0'
+    for e, line in enumerate(stream):
+        if e == 0:
+            continue
+        [idx, stime, occu, ss, en] = line.split()
+        time = float(stime)
+        occu = float(occu)
+        ltable = loopidx_from_ptable(ptable(ss))
+        elen = ltable[1:].count(0)
+        welen = elen * occu
+        if stime != ltime: # Initialzie all possibilities to 0
+            xydata['exterior'].append([time, 0])
+        if maxlen:
+            xydata['exterior'][-1][1] = max(xydata['exterior'][-1][1], elen)
+        else:
+            xydata['exterior'][-1][1] += welen
+
+        if len(ss) > llen:
+            llen = len(ss)
+            lint = float(lltime)
+            time_len.append((float(lltime), len(ss)))
+        if ltime != stime:
+            ltime = stime
+            lltime = ltime
+    logt = time if time > lint + 60 else lint + 60
+    return xydata, lint, logt, time_len
+
 def get_motifs(mfile, mstrings):
     motifs = dict()
 
@@ -235,6 +272,8 @@ def main():
             this option overwrites the fasta-header.""")
     parser.add_argument("--molecule", default = '', metavar = '<str>',
             help = """Include molecule name in the plot. """)
+    parser.add_argument("--exterior-length", action = "store_true", 
+            help = """Plot the mean length of the exterior loop. """)
     parser.add_argument("-f", "--formats", nargs = '+', default = ['pdf'],
             choices = ('pdf', 'svg', 'png', 'gr', 'eps'),
             help = """Plot the simulation using matplotlib (pdf, svg, png)
@@ -256,6 +295,9 @@ def main():
                 raise SystemExit(f"Motif '{n}' not specified.")
         motifs = [(n, motifd[n]) for n in args.motifs]
         xydata, lint, logt, tlen = parse_drf_motifs(sys.stdin, motifs)
+    elif args.exterior_length:
+        motifs = None
+        xydata, lint, logt, tlen = parse_drf_extlen(sys.stdin)
     else:
         motifs = None
         xydata, lint, logt, tlen = parse_drf(sys.stdin)
@@ -269,6 +311,7 @@ def main():
     if mplf:
         with plt.style.context('seaborn-ticks'):
             plot_simulation(xydata, args.name, mplf, lint, logt, tlen, motifs, 
+                    extlen = args.exterior_length,
                     title = args.molecule)
 
  
