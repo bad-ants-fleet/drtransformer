@@ -12,7 +12,7 @@ import RNA
 from . import __version__
 from .landscape import TrafoLandscape
 from .rnafolding import top_down_coarse_graining, parse_model_details
-from .utils import parse_vienna_stdin, get_tkn_simulation_files
+from .utils import parse_vienna_stdin, get_simulation_files
 
 def restricted_float(x):
     y = float(x)
@@ -459,8 +459,10 @@ def main():
 
         if args.tmpdir:
             _fname = _tmpdir + '/' + name + '-' + str(tlen)
-            # Produce input for treekin simulation
-            nlist, bbfile, brfile, bofile, callfile = get_tkn_simulation_files(TL, _fname) 
+            # Produce input for DrSimulate or treekin simulation.
+            # The corresponding commandline will be shown in the last file.
+            # NOTE: the rate matrix is given in transposed form if you select treekin output!
+            nlist, lfile, rfile, pfile, sfile = get_simulation_files(TL, _fname, treekin = False) 
 
         ti, p8, pf = 0, np.zeros(len(p0)), np.zeros(len(p0))
         for (t, pt) in TL.simulate(snodes, p0, times, force=[t1]):

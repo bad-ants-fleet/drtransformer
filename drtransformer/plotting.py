@@ -15,6 +15,68 @@ import matplotlib.pyplot as plt
 from . import __version__
 from RNA import ptable, loopidx_from_ptable
 
+def plot_nxy(stream, basename, formats,
+             title = '',
+             plim = 1e-2,
+             lines = [],
+             xscale = 'log',
+             ylim = None,
+             xlim = None):
+    """ Plot a list of trajectories.
+
+    Args:
+      stream: Usually stdin from a nxy file.
+      basename:
+      formats:
+      title (str, optional): Name of the title for the plot.
+      plim (float, optional): Minimal occupancy to plot a trajectory. Defaults to 0.01
+      lines ([int,..], optional): Selected list of lines to be plotted.
+      xscale (str, optional): *lin* or *log*. Default: *log*.
+      xlim ((float,float), optional): matplotlib xlim.
+      ylim ((float,float), optional): matplotlib ylim.
+
+    Returns:
+      [str]: Name of the output file.
+    """
+
+    # Prepare the plotting
+    fig = plt.figure()
+    fig.set_size_inches(7, 3)
+    ax = fig.add_subplot(1, 1, 1)
+    ax.set_xscale(xscale)
+    ax.set_ylim([-0.02, 1.02])
+    if ylim: ax.set_ylim(ylim)
+    if xlim: ax.set_xlim(xlim)
+
+    lines = set(lines)
+    nxy = [list(map(float, line.strip().split())) for line in stream if line[0] != '#']
+
+    for e, traject in enumerate(zip(*nxy)):
+        if e == 0:
+            time = traject
+            continue
+        if lines and e not in lines:
+            continue
+        if plim and max(traject) < plim:
+            continue
+        p, = ax.plot(time, traject, '-', lw = 1.5)
+        p.set_label("ID {:d}".format(e))
+
+    ax.set_ylabel('occupancy', fontsize = 11)
+    ax.set_xlabel('time [s]', ha = 'center', va = 'center', fontsize = 11)
+    plt.legend()
+
+    # Add ticks for 1 minute, 1 hour, 1 day, 1 year
+    #ax.axvline(x = 60, linewidth = 1, color = 'black', linestyle = '--') # 1 minute
+    #ax.axvline(x = 3600, linewidth = 1, color = 'black', linestyle = '--') # 1 hour
+    #ax.axvline(x = 86400, linewidth = 1, color = 'black', linestyle = '--') # 1 day
+    #ax.axvline(x = 31536000, linewidth = 1, color = 'black', linestyle = '--') # 1 year
+
+    for ending in formats:
+        pfile = basename + '.' + ending
+        plt.savefig(pfile, bbox_inches = 'tight')
+    return 
+
 def plot_simulation(trajectories, basename, formats, 
                     lin_time, log_time, tlen = None, 
                     motifs = None, extlen = False, title = ''):
@@ -285,8 +347,17 @@ def main():
             help = """Specify motifs in a file using dot-bracket notation.""")
     parser.add_argument("--motifstrings", default = None, metavar = '<str>',
             help = """Specify base-pair motifs on the commandline: m1=5-15,6-14:m2=5-81""")
+    parser.add_argument("--nxy", action = "store_true", 
+            help = ("Use nxy format instead of *.drf. ",
+                "This option ignores all other arguments."))
 
     args = parser.parse_args()
+
+    if args.nxy:
+        # A hack to plot a simple nxy format,
+        mplf = [f for f in args.formats if f != 'gr']
+        plot_nxy(sys.stdin, args.name, mplf, title = args.molecule)
+        return
 
     if args.motifs:
         motifd = get_motifs(args.motiffile, args.motifstrings)

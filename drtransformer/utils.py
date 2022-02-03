@@ -109,46 +109,46 @@ def parse_vienna_stdin(stdin, chars = 'ACUGN&', skip = '-'):
             m.string[m.span()[0]], seq))
     return name, seq
 
-def get_tkn_simulation_files(TL, basename):
-    """ Print a rate matrix and the initial occupancy vector.
+def get_simulation_files(TL, basename, treekin = False):
+    """Print a simulation files for rate matrix, the initial occupancy vector and a call for DrSimulate.
+
+    NOTE: the rate matrix is given in transposed form if you select treekin output!
 
     This function prints files and parameters to simulate dynamics using the
-    commandline tool treekin. A *.bar file contains a sorted list of present
-    structures, their energy and their neighborhood and the corresponding
-    energy barriers. A *.rts or *.rts.bin file contains the matrix of
-    transition rates either in text or binary format. Additionaly, it returns
-    a vector "p0", which contains the present occupancy of structures. The
-    order or elements in p0 contains
-
-    Note:
-      A *.bar file contains the energy barriers to all other nodes in the
-      graph. So it is not the same as a "classic" barfile produce by
-      barriers.
+    commandline tool DrSimulate (or treekin). 
+     - A *_lands.txt file contains a sorted list of present structures,
+        their energy and their neighborhood with corresponding energy barriers. 
+     - A *_rates.txt file contains the matrix of transition rates. 
+     - A *_pinit.txt file contains the vector "p0" with initial conditions for the
+        rate matrix.
+     - A *_drsim.txt contains the commandline-call quivalent.
 
     Args:
-      basename (str): Basename of output files.
+        basename (str): Basename of output files.
+        treekin (bool, optional): Return output for treekin.
 
     Returns:
-
+        A list of file names.
     """
     seq = TL.transcript
     nodes = TL.nodes
     snodes = sorted(TL.active_local_mins, key = lambda x: TL.nodes[x]['energy'])
     num = len(snodes) + 1
 
-    bofile = basename + '_lands.bar'
-    brfile = basename + '_rates.txt'
-    bbfile = basename + '_rates.bin'
-    p0file = basename + '_p0.txt'
-    p0 = []
+    lfile = basename + '_lands.txt'
+    rfile = basename + '_rates.txt'
+    pfile = basename + '_pinit.txt'
+    sfile = basename + '_drsim.txt'
 
-    with open(bofile, 'w') as bar, open(brfile, 'w') as rts, open(bbfile, 'wb') as brts, open(p0file, 'w') as pf:
+    p0 = []
+    with open(lfile, 'w') as bar, open(rfile, 'w') as rts, \
+         open(pfile, 'w') as ini, open(sfile, 'w') as sim:
         bar.write("  ID {}  Energy  {}\n".format(seq, 
             ' '.join(map("{:7d}".format, range(1, num)))))
-        brts.write(pack("i", len(snodes)))
         for ni, node in enumerate(snodes, 1):
             ne = nodes[node]['energy']
             no = nodes[node]['occupancy']
+            p0.append(no)
 
             # Calculate barrier heights to all other basins.
             barstr = ''
@@ -163,25 +163,30 @@ def get_tkn_simulation_files(TL, basename):
             # Print structures and neighbors to bfile:
             bar.write("{:4d} {} {:7.2f} {}\n".format(ni, node[:len(seq)], ne/100, barstr))
 
-            # Add ni occupancy to p0
-            if no > 0:
-                p0.append("{}={}".format(ni, no))
-
             # Print rate matrix to rfile and brfile
-            trates = []
             rates = []
+            trates = [] # treekin format
             for other in snodes:
                 if TL.has_cg_edge(node, other):
-                    rates.append(TL.cg_edges[(node, other)]['weight'])
-                    trates.append(TL.cg_edges[(other, node)]['weight'])
+                    rates.append(TL.cg_edges[(other, node)]['weight'])
+                    trates.append(TL.cg_edges[(node, other)]['weight'])
                 else:
                     rates.append(0)
                     trates.append(0)
-            line = "".join(map("{:10.4g}".format, rates))
+            if treekin:
+                line = "".join(map("{:10.4g}".format, trates))
+            else:
+                line = "".join(map("{:10.4g}".format, rates))
             rts.write("{}\n".format(line))
-            for r in trates:
-                brts.write(pack("d", r))
-        pf.write(f"cat {brfile} | treekin {' '.join(f'--p0 {p}' for p in p0)}\n")
 
-    return snodes, bbfile, brfile, bofile, p0file
+        p0s = [f'{i:10.4g}' for i in p0]
+        ini.write(f"{' '.join(p0s)}\n")
+        if treekin:
+            p0s = ' --p0 '.join(f'{i}={p}' for i, p in enumerate(p0, 1) if p > 0)
+            sim.write(f"cat {rfile} | treekin --p0 {p0s}\n")
+        else:
+            p0s = ' '.join(f'{i}={p}' for i, p in enumerate(p0, 1) if p > 0)
+            sim.write(f"DrSimulate -r {rfile} --p0 {p0s}\n")
+
+    return snodes, lfile, rfile, pfile, sfile
 
