@@ -348,8 +348,7 @@ def main():
     parser.add_argument("--motifstrings", default = None, metavar = '<str>',
             help = """Specify base-pair motifs on the commandline: m1=5-15,6-14:m2=5-81""")
     parser.add_argument("--nxy", action = "store_true", 
-            help = ("Use nxy format instead of *.drf. ",
-                "This option ignores all other arguments."))
+            help = "Use nxy format instead of *.drf. This option ignores all other arguments.")
 
     args = parser.parse_args()
 
