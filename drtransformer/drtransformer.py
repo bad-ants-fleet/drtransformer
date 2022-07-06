@@ -89,7 +89,7 @@ def parse_drtrafo_args(parser):
     ############################
     # Transcription parameters #
     ############################
-    trans.add_argument("--t-ext", type = float, default = 0.02, metavar = '<flt>',
+    trans.add_argument("--t-ext", type = float, default = 0.04, metavar = '<flt>',
             help = """Inverse of transcription rate, i.e. time per nucleotide extension
             [seconds per nucleotide].""")
 
@@ -116,12 +116,16 @@ def parse_drtrafo_args(parser):
             network. The structures with lowest occupancy are removed until
             at most o-prune occupancy has been removed from the total population. """)
 
-    algo.add_argument("--t-fast", type = float, default = 0.001, metavar = '<flt>',
+    algo.add_argument("--cg-auto", type = float, default = 10, metavar = '<flt>',
+            help = """Adjust the --t-fast parameter relative to the current
+            extension time: --t-fast = --t-ext / --cg-auto. """)
+
+    algo.add_argument("--t-fast", type = float, default = None, metavar = '<flt>',
             help = """Folding times faster than --t-fast are considered
             instantaneous.  Structural transitions that are faster than
             --t-fast are considered part of the same macrostate. Directly
             translates to an energy barrier separating conformations using:
-            dG = -RT*ln((1/t-fast)/k0). None: t-fast = 1/k_0 """)
+            dG = -RT*ln((1/t-fast)/k0). Overwrites the --cg-auto parameter.""")
 
     algo.add_argument("--minh", type = float, default = None, metavar = '<flt>',
             # An alternative to specify --t-fast in terms of a barrier height.
@@ -149,7 +153,7 @@ def parse_drtrafo_args(parser):
     algo.add_argument("--delth", type = int, default = 10, metavar = '<int>',
             help = """Delete structures if inactive for more than *delth* rounds.""")
 
-    algo.add_argument("--k0", type = float, default = 2e5, metavar = '<flt>',
+    algo.add_argument("--k0", type = float, default = 2.5e4, metavar = '<flt>',
             help = """Arrhenius rate constant (pre-exponential factor). Adjust
             this constant of the Arrhenius equation to relate free energy
             changes to experimentally determined folding time [atu/sec].""")
@@ -300,9 +304,9 @@ def main():
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
     if args.minh:
-        logger.warning('Overwriting t-fast parameter.')
+        logger.warning('Overwriting t-fast/cg-auto parameters.')
         args.t_fast = 1/(args.k0 * math.exp(-args.minh/_RT))
-    else:
+    elif args.t_fast is not None:
         args.minh = max(0, -_RT * math.log(1 / args.t_fast / args.k0))
     logger.info((f'--t-fast: {args.t_fast} s => {args.minh} kcal/mol barrier height '
                  f'and {1/args.t_fast} /s rate at k0 = {args.k0}'))
@@ -379,7 +383,7 @@ def main():
     TL.k0 = args.k0
     TL.fpwm = args.fpwm
     TL.mfree = args.mfree
-    TL.minh = 0 if not args.minh else int(round(args.minh*100))
+    TL.minh = None if not args.minh else int(round(args.minh*100))
     TL.transcript_length = args.start - 1
 
     psites = np.full(args.stop+1, args.t_ext, dtype = float)
@@ -403,6 +407,10 @@ def main():
                      f'{len(list(TL.active_nodes)):3d} active structures, '
                      f'{len(list(TL.inactive_nodes)):3d} inactive structures.'))
         itime = datetime.now()
+
+        ext = psites[tlen]
+        minh = max(0, -_RT * math.log(args.cg_auto / ext / args.k0))
+        print(minh)
 
         # Get new nodes and connect them.
         nn, on, prep = TL.expand(args.profile)

@@ -48,7 +48,6 @@ class TrafoLandscape:
         # Default parameters:
         self.k0 = 2e5 # set directly
         self.minh = 0 # [dcal/mol] set using t_fast
-        self.maxh = 0 # [dcal/mol] set using t_slow
         self.fpwm = 0 # set directly
         self.mfree = 6 # set directly
         self.transcript_length = 0 # set directly, updated automatically
@@ -197,6 +196,7 @@ class TrafoLandscape:
         seq = self.transcript
         fc = self.fc
         mfree = self.mfree
+        minh = self.minh
 
         # Calculate MFE of current transcript.
         mfess, _ = fc.backtrack(len(seq))
@@ -265,7 +265,7 @@ class TrafoLandscape:
                                                              self.nodes[k[1]]['active']) and 
                                                              v['saddle_energy'] is not None}
 
-            ndata, edata = neighborhood_flooding((fseq, md, fpwm), ndata, gedges, tedges = edata, minh = self.minh)
+            ndata, edata = neighborhood_flooding((fseq, md, fpwm), ndata, gedges, tedges = edata, minh = minh)
 
             # 3) Extract new node data.
             for node in ndata:
