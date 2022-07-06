@@ -303,21 +303,21 @@ def main():
     # and a few more ...
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
-    if args.minh:
+    if args.minh is not None:
         logger.warning('Overwriting t-fast/cg-auto parameters.')
         args.t_fast = 1/(args.k0 * math.exp(-args.minh/_RT))
     elif args.t_fast is not None:
         args.minh = max(0, -_RT * math.log(1 / args.t_fast / args.k0))
-    logger.info((f'--t-fast: {args.t_fast} s => {args.minh} kcal/mol barrier height '
-                 f'and {1/args.t_fast} /s rate at k0 = {args.k0}'))
-
-    if not args.force and args.t_fast and args.t_fast * 10 > args.t_ext:
-        raise SystemExit(
-                ('ERROR: Conflicting Settings: '
-                 'Arguments must be such that "--t-fast" * 10 > "--t-ext".\n'
-                 '       => An instant folding time must be at least 10x '
-                 'shorter than the time of nucleotide extension. '
-                 'You may use --force to ignore this setting.'))
+    if args.minh or args.t_fast:
+        logger.info((f'--t-fast: {args.t_fast} s => {args.minh} kcal/mol barrier height '
+                     f'and {1/args.t_fast} /s rate at k0 = {args.k0}'))
+        if not args.force and args.t_fast and args.t_fast * 10 > args.t_ext:
+            raise SystemExit(
+                    ('ERROR: Conflicting Settings: '
+                     'Arguments must be such that "--t-fast" * 10 > "--t-ext".\n'
+                     '       => An instant folding time must be at least 10x '
+                     'shorter than the time of nucleotide extension. '
+                     'You may use --force to ignore this setting.'))
 
     ############################
     # ~~~~~~~~~~~~~~~~~~~~~~~~ #
@@ -401,16 +401,20 @@ def main():
 
     time = 0
     for tlen in range(args.start, args.stop+1):
+        itime = datetime.now()
         logger.info(f'** Transcription step {tlen} **')
+        if args.minh is None:
+            # Autoadjust minh for every transcription step: 10x faster than pause.
+            minh = max(0, -_RT * math.log(args.cg_auto / psites[tlen] / args.k0))
+            fast = 1/(args.k0 * math.exp(-minh/_RT))
+            TL.minh = int(round(minh*100))
+            logger.info((f't-fast: {fast} s => {minh} kcal/mol barrier height '
+                     f'and {1/fast} /s rate at k0 = {args.k0}'))
+
         logger.info((f'Before expansion:      '
                      f'{len(list(TL.active_local_mins)):3d} active lmins, '
                      f'{len(list(TL.active_nodes)):3d} active structures, '
                      f'{len(list(TL.inactive_nodes)):3d} inactive structures.'))
-        itime = datetime.now()
-
-        ext = psites[tlen]
-        minh = max(0, -_RT * math.log(args.cg_auto / ext / args.k0))
-        print(minh)
 
         # Get new nodes and connect them.
         nn, on, prep = TL.expand(args.profile)
