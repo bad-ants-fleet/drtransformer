@@ -117,8 +117,9 @@ def parse_drtrafo_args(parser):
             at most o-prune occupancy has been removed from the total population. """)
 
     algo.add_argument("--cg-auto", type = float, default = 10, metavar = '<flt>',
-            help = """Adjust the --t-fast parameter relative to the current
-            extension time: --t-fast = --t-ext / --cg-auto. """)
+            help = """Sets the coarse-graining parameter (--t-fast) as a multiple
+            of the present transcription rate. (A convenience parameter to adjust
+            --t-fast automatically when varying --t-ext. """)
 
     algo.add_argument("--t-fast", type = float, default = None, metavar = '<flt>',
             help = """Folding times faster than --t-fast are considered
@@ -153,7 +154,7 @@ def parse_drtrafo_args(parser):
     algo.add_argument("--delth", type = int, default = 10, metavar = '<int>',
             help = """Delete structures if inactive for more than *delth* rounds.""")
 
-    algo.add_argument("--k0", type = float, default = 2.5e4, metavar = '<flt>',
+    algo.add_argument("--k0", type = float, default = 1e5, metavar = '<flt>',
             help = """Arrhenius rate constant (pre-exponential factor). Adjust
             this constant of the Arrhenius equation to relate free energy
             changes to experimentally determined folding time [atu/sec].""")
@@ -308,16 +309,19 @@ def main():
         args.t_fast = 1/(args.k0 * math.exp(-args.minh/_RT))
     elif args.t_fast is not None:
         args.minh = max(0, -_RT * math.log(1 / args.t_fast / args.k0))
-    if args.minh or args.t_fast:
-        logger.info((f'--t-fast: {args.t_fast} s => {args.minh} kcal/mol barrier height '
-                     f'and {1/args.t_fast} /s rate at k0 = {args.k0}'))
-        if not args.force and args.t_fast and args.t_fast * 10 > args.t_ext:
-            raise SystemExit(
-                    ('ERROR: Conflicting Settings: '
-                     'Arguments must be such that "--t-fast" * 10 > "--t-ext".\n'
-                     '       => An instant folding time must be at least 10x '
-                     'shorter than the time of nucleotide extension. '
-                     'You may use --force to ignore this setting.'))
+    else: # cg-auto
+        args.minh = max(0, -_RT * math.log(args.cg_auto / args.t_ext / args.k0))
+        args.t_fast = 1/(args.k0 * math.exp(-args.minh/_RT))
+
+    logger.info((f'--t-fast: {args.t_fast} s => {args.minh} kcal/mol barrier height '
+                 f'and {1/args.t_fast} /s rate at k0 = {args.k0}'))
+    if not args.force and args.t_fast and args.t_fast * 10 > args.t_ext:
+        raise SystemExit(
+                ('ERROR: Conflicting Settings: '
+                 'Arguments must be such that "--t-fast" * 10 > "--t-ext".\n'
+                 '       => An instant folding time must be at least 10x '
+                 'shorter than the time of nucleotide extension. '
+                 'You may use --force to ignore this setting.'))
 
     ############################
     # ~~~~~~~~~~~~~~~~~~~~~~~~ #
@@ -383,7 +387,7 @@ def main():
     TL.k0 = args.k0
     TL.fpwm = args.fpwm
     TL.mfree = args.mfree
-    TL.minh = None if not args.minh else int(round(args.minh*100))
+    TL.minh = int(round(args.minh*100))
     TL.transcript_length = args.start - 1
 
     psites = np.full(args.stop+1, args.t_ext, dtype = float)
@@ -403,14 +407,6 @@ def main():
     for tlen in range(args.start, args.stop+1):
         itime = datetime.now()
         logger.info(f'** Transcription step {tlen} **')
-        if args.minh is None:
-            # Autoadjust minh for every transcription step: 10x faster than pause.
-            minh = max(0, -_RT * math.log(args.cg_auto / psites[tlen] / args.k0))
-            fast = 1/(args.k0 * math.exp(-minh/_RT))
-            TL.minh = int(round(minh*100))
-            logger.info((f't-fast: {fast} s => {minh} kcal/mol barrier height '
-                     f'and {1/fast} /s rate at k0 = {args.k0}'))
-
         logger.info((f'Before expansion:      '
                      f'{len(list(TL.active_local_mins)):3d} active lmins, '
                      f'{len(list(TL.active_nodes)):3d} active structures, '
