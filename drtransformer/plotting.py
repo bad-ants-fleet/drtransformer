@@ -163,10 +163,11 @@ def plot_simulation(trajectories, basename, formats,
         ax1.set_ylabel('occupancy')
     ax1.set_xlabel('time (seconds)')
     ax1.xaxis.set_label_coords(0.7, -0.15)
-    ax1t.set_xlabel(f'{title} transcript length')
+    ax1t.set_xlabel(f'transcript length')
     ax1t.xaxis.set_label_coords(0.7, 1.15)
     if not extlen:
         ax2.legend()
+    plt.suptitle(f'{title}', fontsize = 16, y=1.15)
 
     # Save a file.
     for ending in formats:
@@ -293,7 +294,9 @@ def get_motifs(mfile, mstrings):
             for line in mf:
                 if line[0] == '#':
                     continue
-                dbr, name = line.split()
+                if not line.strip():
+                    continue
+                dbr, name = line.split()[0:2]
                 if name in motifs:
                     raise SystemExit(f"Motif '{name}' is specified multiple times.")
                 motif = dbr_to_motif(dbr) 
