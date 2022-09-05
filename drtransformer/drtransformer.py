@@ -315,9 +315,9 @@ def main():
 
     logger.info((f'--t-fast: {args.t_fast} s => {args.minh} kcal/mol barrier height '
                  f'and {1/args.t_fast} /s rate at k0 = {args.k0}'))
-    if not args.force and args.t_fast and args.t_fast * 10 > args.t_ext:
+    if not args.force and args.t_fast and args.t_fast * 10 > args.t_ext + 0.000001:
         raise SystemExit(
-                ('ERROR: Conflicting Settings: '
+                (f'ERROR: Conflicting Settings: {args.t_fast=} {args.t_ext=} '
                  'Arguments must be such that "--t-fast" * 10 > "--t-ext".\n'
                  '       => An instant folding time must be at least 10x '
                  'shorter than the time of nucleotide extension. '
