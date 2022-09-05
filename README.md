@@ -112,9 +112,14 @@ structures at the end of transcription.
  - Motifs for DrPlotter can also contain 'x' in the dot-bracket notation for *must be unpaired*.
 
 ## Version
+
 v0.11 -- using lonley base-pairs
   * removed the --noLP default (added parameter setting)
   * added profiling option for runtime optimization
+  * using --cg-auto default paramter
+  * using k0=1e5, t-ext=0.04 default parameter
+  * added new visulization types and fixed motif file input
+  * added epsilon to t-fast sanity check
 
 v0.10 -- moved to beta status (first official release)
   * changes in parameter defaults 
