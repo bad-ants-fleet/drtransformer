@@ -138,7 +138,7 @@ software depends on the [ViennaRNA] package which is available through the
 [ViennaRNA license], which is more restricted with respect to commertial use. 
 
 ## Cite
-Badelt et al. (in preparation)
+Badelt, Lorenz, Hofacker: "DrTransformer: Heuristic cotranscriptional RNA folding using the nearest neighbor energy model." (submitted)
  
 [//]: References
 [ViennaRNA]: <http://www.tbi.univie.ac.at/RNA>
