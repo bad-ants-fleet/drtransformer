@@ -320,6 +320,27 @@ def get_bpd_i_cache(p, q):
         BPD_I_CACHE[(q, p)] = dIq
     return BPD_I_CACHE[(p, q)]
 
+def shortcut_edge_search(nodes, edges):
+    """Add edges d(x,y) if E edges to n s.t. [d(x,n),d(n,y) > d(x,y)]
+    """
+    guide_nbrs = {n: set() for n in nodes}
+    for (p, q) in edges: 
+        assert p != q
+        guide_nbrs[p].add(q)
+    for n in nodes:
+        for (p, q) in combinations(guide_nbrs[n], 2):
+            assert (p, n) in edges
+            assert (n, q) in edges
+            if (p, q) in edges:
+                continue
+            dpq = get_bpd_cache(p, q)
+            dpn = get_bpd_cache(p, n) 
+            dnq = get_bpd_cache(n, q)
+            if dpn + dnq > dpq:
+                edges.add((p, q))
+                edges.add((q, p))
+    return edges
+
 def guiding_edge_search(nodes, edges = None):
     """ Find all edges of the guiding neighborhood.
 
@@ -358,7 +379,10 @@ def guiding_node_search(seq, md, nodes, edges, fc_empty, mind = 5):
     """ For every edge in the graph, find the MFE intersect.
 
     Args:
-        ...
+        seq: The RNA sequence.
+        md: ViennaRNA model details.
+        nodes: An set of input structures.
+        edges: A set of input reactions (node pairs).
         fc_empty (fold compound): A fold compound where
             all base-pairs are forbidden.
         mind (int, optional): A minimum base-pair distance
@@ -378,64 +402,47 @@ def guiding_node_search(seq, md, nodes, edges, fc_empty, mind = 5):
         mss, mfe = mfe_intersect(seq, md, bps, fc_empty)
         if mss not in nodes:
             lmins.add((mss, mfe))
-            css, cfe = mfe_constrained(seq, md, mss)
-            if css not in nodes:
-                lmins.add((css, cfe))
         seen.add((s1, s2))
     return lmins
 
 def get_guide_graph(seq, md, gnodes, gedges = None, tgn_folded = None):
     """ Guide graph constuction.
 
+    Args:
+        seq: The RNA sequence (for constrained folding).
+        md: ViennaRNA model details (for constrained folding).
+        gnodes: A set of input guide nodes.
+        gedges (optional): A set/list of input guide edges which will always be returned.
+        tgn_folded: A cache to look up previous results of constrained folding for a node.
+
     Returns:
-        (list): A list of new nodes.
-        (set): A set of new edges.
+        (list): A list of *new* nodes.
+        (set): A set of all edges.
     """
     fc_empty = forbid_all_basepairs(seq, RNA.fold_compound(seq, md))
-    all_gnodes = set(gnodes)
-    assert len(all_gnodes) == len(gnodes)
     if tgn_folded is None:
-        tgn_folded = {n: False for n in all_gnodes}
-    else:
-        assert all((n in tgn_folded) for n in gnodes)
+        tgn_folded = dict()
+    all_gnodes = set(gnodes) # make sure it is a set.
     new_gnodes = []
     while True:
-        # Do the constrained folding for all nodes.
-        for con in gnodes:
-            if not tgn_folded[con]:
+        # Do the constrained folding for all gnodes.
+        for con in list(all_gnodes):
+            if not tgn_folded.get(con, False):
                 css, cen = mfe_constrained(seq, md, con)
                 tgn_folded[con] = True
                 tgn_folded[css] = True
                 if css not in all_gnodes:
                     all_gnodes.add(css)
                     new_gnodes.append((css, cen))
-
+ 
         # Find all guide edges in the graph (only force input gedges).
-        new_gedges = guiding_edge_search(all_gnodes, gedges)
+        all_gedges = guiding_edge_search(all_gnodes, gedges)
 
         # Now add all shortcut edges.
-        guide_nbrs = {n: set() for n in all_gnodes}
-        for (p, q) in new_gedges: 
-            assert p != q
-            guide_nbrs[p].add(q)
-        for n in all_gnodes:
-            for (p, q) in combinations(guide_nbrs[n], 2):
-                assert (p, n) in new_gedges
-                assert (n, q) in new_gedges
-                dpq = get_bpd_cache(p, q)
-                dpn = get_bpd_cache(p, n) 
-                dnq = get_bpd_cache(n, q)
-                if (p, q) in new_gedges:
-                    continue
-                # NOTE: Do not assert the line below, the reason why two points
-                # are not connected can be a different node than current n.
-                #assert max(dpn, dnq) <= dpq
-                if dpn + dnq > dpq:
-                    new_gedges.add((p, q))
-                    new_gedges.add((q, p))
+        all_gedges = shortcut_edge_search(all_gnodes, all_gedges)
 
-        # Find guide nodes that should be added to the graph.
-        add_gnodes = guiding_node_search(seq, md, all_gnodes, new_gedges, fc_empty)
+        # Find new nodes that should be added to the graph.
+        add_gnodes = guiding_node_search(seq, md, all_gnodes, all_gedges, fc_empty)
         if not add_gnodes:
             break
         for (ss, en) in add_gnodes:
@@ -443,9 +450,8 @@ def get_guide_graph(seq, md, gnodes, gedges = None, tgn_folded = None):
             assert ss not in tgn_folded
             all_gnodes.add(ss) 
             new_gnodes.append((ss, en))
-            tgn_folded[ss] = False
     del fc_empty
-    return new_gnodes, new_gedges
+    return new_gnodes, all_gedges
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 # Findpath stuff                                                               #
@@ -751,12 +757,14 @@ def neighborhood_flooding(fp, ndata, gedges, tedges = None, minh = None):
     if tedges is None:
         tedges = dict()
 
+    # guide nbrs for each node that are not in known transition edges.
     guide_nbrs = {k: set() for k in ndata}
     for (p, q) in gedges: 
         assert p != q
         if (p, q) not in tedges:
             guide_nbrs[p].add(q)
 
+    # all neighbors from transition edges
     tstep_nbrs = {k: set() for k in ndata}
     for (p, q) in tedges: 
         assert p != q

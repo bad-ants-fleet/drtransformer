@@ -375,7 +375,8 @@ class TrafoLandscape:
                 force = [times[-1]]
             elif force[-1] < times[-1]:
                 force.append(times[-1])
-            yield times[0], [1]
+            if times[0] != force[0]:
+                yield times[0], [1]
             for ft in force:
                 yield ft, [1]
             return

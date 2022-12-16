@@ -78,12 +78,13 @@ def plot_nxy(stream, basename, formats,
     return 
 
 def plot_simulation(trajectories, basename, formats, 
-                    lin_time, log_time, tlen = None, 
+                    lin_time, log_time, plim = 0.05, tlen = None, 
                     motifs = None, extlen = False, title = ''):
     """DrTransformer standard plotting function.
     """
 
     fig, axs = plt.subplots(1, 2, gridspec_kw={'width_ratios': [1.8, 1]})
+    #fig.set_size_inches(4, 1.95) # paper dims
     fig.set_size_inches(7, 3)
     plt.subplots_adjust(wspace=0)
 
@@ -134,7 +135,7 @@ def plot_simulation(trajectories, basename, formats,
         for i, (name, _) in enumerate(motifs):
             line = trajectories[f'{name}']
             t, o = list(zip(*line))
-            (lw, dh, zo) = (2, '-', 1) if max(o) >= 0.01 else (1, '--', 3)
+            (lw, dh, zo) = (2, '-', 1) if max(o) >= plim else (1, '--', 3)
             p, = ax1.plot(t, o, dh, lw=lw, color = f'C{i}', zorder = zo)
             l, = ax2.plot(t, o, dh, lw=lw, color = f'C{i}', zorder = zo)
             l.set_label(f'{name}')
@@ -163,11 +164,14 @@ def plot_simulation(trajectories, basename, formats,
         ax1.set_ylabel('occupancy')
     ax1.set_xlabel('time (seconds)')
     ax1.xaxis.set_label_coords(0.7, -0.15)
+    #ax1.xaxis.set_label_coords(0.7, -0.20) # paper dims
     ax1t.set_xlabel(f'transcript length')
     ax1t.xaxis.set_label_coords(0.7, 1.15)
+    #ax1t.xaxis.set_label_coords(0.7, 1.25) # paper dims
     if not extlen:
         ax2.legend()
     plt.suptitle(f'{title}', fontsize = 16, y=1.15)
+    #plt.suptitle(f'{title}', fontsize = 16, y=1.25) # paper dims
 
     # Save a file.
     for ending in formats:
@@ -280,37 +284,24 @@ def parse_drf_extlen(stream, maxlen = False):
     logt = time if time > lint + 60 else lint + 60
     return xydata, lint, logt, time_len
 
-def get_motifs(mfile, mstrings):
+def get_motifs(mfile):
     motifs = dict()
-
     def dbr_to_motif(dbr):
         pt = ptable(dbr)
         motP = [(i, j) for i, j in enumerate(pt) if i and i < j]
         motA = [i for i, j in enumerate(dbr, 1) if j == 'x']
         return (motP, motA)
-
-    if mfile:
-        with open(mfile, 'r') as mf:
-            for line in mf:
-                if line[0] == '#':
-                    continue
-                if not line.strip():
-                    continue
-                dbr, name = line.split()[0:2]
-                if name in motifs:
-                    raise SystemExit(f"Motif '{name}' is specified multiple times.")
-                motif = dbr_to_motif(dbr) 
-                motifs[name] = motif
-    if mstrings:
-        mstrings = mstrings.split(':')
-        for e, bpl in enumerate(mstrings):
-            name, bpl = bpl.split('=')
+    with open(mfile, 'r') as mf:
+        for line in mf:
+            if line[0] == '#':
+                continue
+            if not line.strip():
+                continue
+            dbr, name = line.split()[0:2]
             if name in motifs:
                 raise SystemExit(f"Motif '{name}' is specified multiple times.")
-            motif = [tuple(int(x) for x in bp.split('-')) for bp in bpl.split(',')]
-            motP = [tup for tup in motif if len(tup) == 2]
-            motA = [tup[0] for tup in motif if len(tup) == 1]
-            motifs[name] = (motP, motA)
+            motif = dbr_to_motif(dbr) 
+            motifs[name] = motif
     return motifs
 
 def motif_finder(ss, motif):
@@ -319,6 +310,32 @@ def motif_finder(ss, motif):
         return all(pt[i] == j for (i, j) in motif[0]) and all(pt[i] == 0 for i in motif[1])
     except IndexError:
         return False
+
+def get_uprobs(stream):
+    uprobs = []
+    llen, ltime, lltime = 0, '0', '0'
+    up = []
+    for i, line in enumerate(stream):
+        if i == 0:
+            assert line == "id time occupancy structure energy\n"
+            continue
+        [_, stime, occ, ss, en] = line.split()
+        occu = float(occ)
+        if ltime == stime and len(ss) == llen:
+            for j, b in enumerate(ss):
+                 if b == '.': 
+                     up[j] += occu
+        else:
+            #if len(ss) > llen:
+            uprobs.append(up)
+            up = [0 for _ in range(len(ss))]
+            for j, b in enumerate(ss):
+                 if b == '.': 
+                     up[j] += occu
+        llen = len(ss)
+        ltime = stime
+    uprobs.append(up)
+    return uprobs
 
 def main():
     """ DrPlotter -- visulization of cotranscriptional folding simulations.
@@ -344,14 +361,16 @@ def main():
             help = """Plot the simulation using matplotlib (pdf, svg, png)
             and/or write an input file for xmgrace (gr). The legend uses 
             the identities of structures as specifed in the logfile. """)
-    parser.add_argument("-m", "--motifs", nargs = '+', default = None, metavar = '<str>',
-            help = """Select specific motif names for plotting. The motifs must be defined via the motiffile or motifstrings options.""")
     parser.add_argument("--motiffile", default = None, metavar = '<str>',
             help = """Specify motifs in a file using dot-bracket notation.""")
-    parser.add_argument("--motifstrings", default = None, metavar = '<str>',
-            help = """Specify base-pair motifs on the commandline: m1=5-15,6-14:m2=5-81""")
+    parser.add_argument("-m", "--motifs", nargs = '+', default = None, metavar = '<str>',
+            help = """Select specific motif names for plotting. The motifs must be defined in the motiffile.""")
     parser.add_argument("--nxy", action = "store_true", 
             help = "Use nxy format instead of *.drf. This option ignores all other arguments.")
+    parser.add_argument("--plim", type = float, default = 0.05,
+            help = "Define occupancy limit for legend.")
+    parser.add_argument("--accessibilities", action = "store_true", 
+            help = """Use heatmaps to show accessibility profiles during transcription (preliminary feature; requires seaborn). """)
 
     args = parser.parse_args()
 
@@ -361,8 +380,34 @@ def main():
         plot_nxy(sys.stdin, args.name, mplf, title = args.molecule)
         return
 
+    if args.accessibilities:
+        import seaborn as sns
+        si, sl = 0, 30
+        uprobs = get_uprobs(sys.stdin) 
+        d1 = len(uprobs)
+        d2 = len(uprobs[-1])
+        mx = np.zeros((d1, d2))
+        mask = np.zeros_like(mx)
+        ylabs = []
+        for i, l in enumerate(uprobs):
+            mx[i][:len(l)] = l
+            mask[i][len(l):] = True
+            if (not si) and (len(l) == sl):
+                si = i
+            if si:
+                ylabs.append(len(l))
+        ax = sns.heatmap(mx[si:], mask = mask[si:], square = True, cmap="viridis", linewidth=0)
+        yticks = np.linspace(0, len(ylabs) - 1, 10, dtype=np.int)
+        ax.set_yticks(yticks)
+        ylabels = [ylabs[idx] for idx in yticks]
+        ax.set_yticklabels(ylabels)
+        for ending in args.formats:
+            pfile = args.name + '.' + ending
+            plt.savefig(pfile, bbox_inches = 'tight')
+        return
+
     if args.motifs:
-        motifd = get_motifs(args.motiffile, args.motifstrings)
+        motifd = get_motifs(args.motiffile)
         for n in args.motifs:
             if n not in motifd:
                 raise SystemExit(f"Motif '{n}' not specified.")
@@ -383,7 +428,8 @@ def main():
     mplf = [f for f in args.formats if f != 'gr']
     if mplf:
         with plt.style.context('seaborn-ticks'):
-            plot_simulation(xydata, args.name, mplf, lint, logt, tlen, motifs, 
+            plot_simulation(xydata, args.name, mplf, lint, logt, args.plim, 
+                    tlen = tlen, motifs = motifs, 
                     extlen = args.exterior_length,
                     title = args.molecule)
 

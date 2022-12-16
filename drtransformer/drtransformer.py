@@ -74,11 +74,11 @@ def parse_drtrafo_args(parser):
             contrast to t-fast, this does *not* affect the accuracy of the
             model.""")
 
-    output.add_argument("--t-lin", type = int, default = 30, metavar = '<int>',
+    output.add_argument("--t-lin", type = int, default = 10, metavar = '<int>',
             help = """Evenly space output *--t-lin* times during transcription
             on a linear time scale.""")
 
-    output.add_argument("--t-log", type = int, default = 300, metavar = '<int>',
+    output.add_argument("--t-log", type = int, default = 30, metavar = '<int>',
             help = """Evenly space output *--t-log* times after transcription
             on a logarithmic time scale.""")
 
@@ -222,6 +222,9 @@ def main():
         filepath = args.outdir + '/' + args.name
     else:
         filepath = args.name
+
+    if args.t_lin < 1 or args.t_log < 1:
+        raise SystemExit('ERROR: --t-lin/--t-log must be >= 1')
 
     if args.profile:
         #import statprof
@@ -431,17 +434,18 @@ def main():
         # Adjust the length of the lin-time simulation:
         t0, t1 = 0, psites[tlen]
         # Adjust the length of the log-time simulation:
-        t8 = t1 + args.t_end if tlen == args.stop else t1 + sum(psites[tlen+1:])
+        t8 = args.t_end if tlen == args.stop else t1 + sum(psites[tlen+1:])
         if np.isclose(t0, t1) or np.isclose(t1, t8): # only lin or log-part!
             if np.isclose(t1, t8):
-                times = np.array(np.linspace(t0, t1, args.t_lin))
+                times = np.array(np.linspace(t0, t1, args.t_lin+1))
             else:
-                times = np.array(np.logspace(np.log10(t1), np.log10(t8), num=args.t_log))
+                times = np.array(np.logspace(np.log10(t1), np.log10(t8), num=args.t_log+1))
         else:
-            lin_times = np.array(np.linspace(t0, t1, args.t_lin))
-            log_times = np.array(np.logspace(np.log10(t1), np.log10(t8), num=args.t_log))
+            lin_times = np.array(np.linspace(t0, t1, args.t_lin+1))
+            log_times = np.array(np.logspace(np.log10(t1), np.log10(t8), num=args.t_log+1))
             log_times = np.delete(log_times, 0)
             times = np.concatenate([lin_times, log_times])
+
         if tlen != args.start:
             times = np.delete(times, 0)
 
@@ -494,7 +498,7 @@ def main():
                         continue
                     ne = TL.nodes[node]['energy']/100
                     all_courses[ni] = [(tt, occu)]
-                    fdata = f"{ni} {tt:03.9f} {occu:03.4f} {node[:tlen]} {ne:6.2f}\n"
+                    fdata = f"{ni} {tt:03.4f} {occu:03.4f} {node[:tlen]} {ne:6.2f}\n"
                     write_output(fdata, stdout = (args.stdout == 'drf'), fh = dfh)
             ti, p8 = t, pt
         keep = [n for e, n in enumerate(snodes) if pf[e] > args.o_prune] if args.o_prune else []
