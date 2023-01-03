@@ -36,18 +36,17 @@ command line executables:
 ```
 
 ### An example cotranscriptional folding simulation
-As an example, we show a quick investigation of a cotranscriptional folding
-trap designed by [Xayaphoummine et al. (2006)].  Briefly, two sequences are
-composed of the same palindromic subsequences (A, B, C, D) in forward and
-reverse order (`ABCD` and `DCBA`); the third sequence (`DCMA`) has a
-point mutation which changes B to M. The experiment demonstrates how the order
-of helix formation determines which structures are formed at the end of
-transcription, an effect that cannot be observed with a thermodynamic
-equilibrium prediction, because the free energies of, for example, the helices
-A:B and B:A are almost the same due to their palindromic subsequences.
-The three input files [`ABCD.fa`], [`DCBA.fa`] and [`DCMA.fa`] 
-contain a fasta header and the respective sequence from the original publication.
-Those files can be found in the subfolder [`examples/`]. 
+We show simulations of three sequences designed by [Xayaphoummine et
+al. (2006)].  Briefly, two sequences are composed of the same palindromic
+subsequences (A, B, C, D) in forward and reverse order (`ABCD` and `DCBA`); the
+third sequence (`DCMA`) has a point mutation which changes B to M. The
+experiment demonstrates how the order of helix formation determines which
+structures are formed at the end of transcription, an effect that cannot be
+observed with a thermodynamic equilibrium prediction, because the free energies
+of, for example, the helices A:B and B:A are almost the same due to their
+palindromic subsequences.  The three input files [`ABCD.fa`], [`DCBA.fa`] and
+[`DCMA.fa`] contain a fasta header and the respective sequence from the
+original publication.  Those files can be found in the subfolder [`examples/`]. 
 
 ```sh
   ~$ cat ABCD.fa | DrTransformer --name ABCD --o-prune 0.01 --logfile 
