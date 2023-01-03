@@ -36,17 +36,26 @@ command line executables:
 ```
 
 ### An example cotranscriptional folding simulation
-As an example, let's do a quick investigation of a cotranscriptional folding
-trap designed by [Xayaphoummine et al. (2006)]. The relevant files can be found
-in the subfolder [`examples/`], in particular the three files [`ABCD.fa`],
-[`DCBA.fa`] and [`DCBAmod.fa`]. Those files contain only a fasta header and the
-respective sequence from the publication.
+As an example, we show a quick investigation of a cotranscriptional folding
+trap designed by [Xayaphoummine et al. (2006)].  Briefly, two sequences are
+composed of the same palindromic subsequences (A, B, C, D) in forward and
+reverse order (`ABCD` and `DCBA`); the third sequence (`DCMA`) has a
+point mutation which changes B to M. The experiment demonstrates how the order
+of helix formation determines which structures are formed at the end of
+transcription, an effect that cannot be observed with a thermodynamic
+equilibrium prediction, because the free energies of, for example, the helices
+A:B and B:A are almost the same due to their palindromic subsequences.
+The three input files [`ABCD.fa`], [`DCBA.fa`] and [`DCMA.fa`] 
+contain a fasta header and the respective sequence from the original publication.
+Those files can be found in the subfolder [`examples/`]. 
+
 ```sh
   ~$ cat ABCD.fa | DrTransformer --name ABCD --o-prune 0.01 --logfile 
 ```
-The above command line call of DrTransformer produced two files:
+This command line call of DrTransformer produces two files:
  - `ABCD.log` contains a human-readable summary of the cotranscriptional folding process. 
- - `ABCD.drf` contains the details of the cotranscriptional folding simulation. 
+ - `ABCD.drf` contains the details of the cotranscriptional folding simulation in the
+ [DrForna] file format. 
 
 #### Structure-based data analysis
 DrPlotter supports different types of visual analysis for the `.drf` file
@@ -63,46 +72,41 @@ match the ones shown here.** For example, to see which structures are shown at
 the simulation of nucleotide 73, read the log file entries for this transcript
 length:
 ```
-73    1 ....(((((((((((((((....)))))))))))))))....(((((((((.......)))))))))...... -42.40 [0.0240 -> 0.9924] ID = 23
-73    2 ....(((((((((((((((....)))))))))))))))....(((((((((....)).)))))))........ -39.40 [0.7734 -> 0.0076] ID = 21
-73    3 ....(((((((((((((((....)))))))))))))))....(((((((......)).))))).......... -34.80 [0.2027 -> 0.0000] ID = 19
-
+73    1 .(..(((((((((((((((....)))))))))))))))..).(((((((((.......)))))))))...... -42.60 +[0.0213 -> 0.9876] ID = 24
+73    2 ....(((((((((((((((....))))))))))))))).(..(((((((((....)).)))))))..)..... -39.90 -[0.9787 -> 0.0124] ID = 25
 ```
-The logfile lists three potentially interesting structures (in order of their
-free energy), it shows their occupancy at the start of the simulation and
-at the end of a simulation in square brackets, and it provides the ID to follow
-a specific structure through the transcription process. This ID is also used as 
-a label in the plot `ABCD.png`.
+The logfile lists two structures (in order of their free energy), it shows
+their occupancy at the start of the simulation and at the end of a simulation
+in square brackets, and it provides the ID to follow a specific structure
+through the transcription process (+/- indicate a change in occpancy). The IDs
+are used as labels in the plot `ABCD.png`.
 
 ### Motif-based data analysis
-Instead of following specific structures, one can investigate at which point
-the different molecules form specific helix motifs. The paper lists four
-potential helices (*Pa, Pb, Pc, Pd*) for comparison, we provide them in
-dot-bracket notation in the files [`ABCD.motifs`], [`DCBA.motifs`] and
-[`DCBAmod.motifs`], respectively.
+Instead of following specific structures, it is often more helpful to visualize
+when specific helical motifs are formed in the ensemble. Generally, we refer to
+a helix formed from sequences A and B as A:B, etc. All potential helices 
+plotted here are provided in dot-bracket notation in the files [`ABCD.motifs`], [`DCBA.motifs`] and [`DCMA.motifs`].
 ```sh
-  ~$ cat ABCD.drf | DrPlotter --name ABCD-motifs --molecule ABCD --format png --motiffile ABCD.motifs --motifs Pa Pb Pc Pd
-  ~$ cat DCBA.drf | DrPlotter --name DCBA-motifs --molecule DCBA --format png --motiffile DCBA.motifs --motifs Pa Pb Pc Pd
-  ~$ cat DCBAmod.drf | DrPlotter --name DCBAmod-motifs --molecule DCBAmod --format png --motiffile DCBAmod.motifs --motifs Pa Pb Pc Pd
+  ~$ cat ABCD.drf | DrPlotter --name ABCD-motifs --molecule ABCD --format png --motiffile ABCD.motifs --motifs A:B C:D A:D B:C
+  ~$ cat DCBA.drf | DrPlotter --name DCBA-motifs --molecule DCBA --format png --motiffile DCBA.motifs --motifs B:A D:C D:A C:B
+  ~$ cat DCMA.drf | DrPlotter --name DCMA-motifs --molecule DCMA --format png --motiffile DCMA.motifs --motifs M:A D:C D:A C:M
 ```
 <img src="examples/ABCD-motifs.png" alt="ABCD"/><br>
-ABCD forms only structures with motif Pa, Pb but not Pc and Pd. Note how motif
-Pb is not formed "immediately", because there are competing helix motifs which
-are cotranscriptionally favored. (Those motifs can be seen in the previous
-analysis: the structures with ID 19 and 21.)
-
+ABCD forms only structures A:B and C:D but not A:D and B:C. Also, helix C:D is
+not formed "immediately", because there is a competing structure which
+is cotranscriptionally favored (see ID 25 from the previous anlysis).
 
 <img src="examples/DCBA-motifs.png" alt="DCBA"/><br>
-DCBA forms structures with all motifs. The structures containing motifs Pc and
-Pd dominate with more than 90%, the structures containing motifs Pa and Pb are
-below 10% of the population. Eventually, the structures with Pa and Pb will be
+DCBA forms structures with all motifs. The helical structures C:B and
+D:A dominate with more than 90%, the helices D:C and B:A are
+below 10% of the population. Eventually, D:C and B:A will be
 dominant, but not on the time scale simulated here. (Can you repeat the analysis
-to see how much time it needs until Pa and Pb dominate the ensemble?)
+to see how much time it needs until D:C and B:A dominate the ensemble?)
 
-<img src="examples/DCBAmod-motifs.png" alt="DCBAmod"/><br>
-As shown in the publication, a single point mutation (from DCBA to DCBAmod) is
-sufficient to drastically shift occupancy between Pa/Pb and Pc/Pd containing 
-structures at the end of transcription.
+<img src="examples/DCMA-motifs.png" alt="DCMA"><br>
+As shown in the publication, a single point mutation (from DCBA to DCMA) is
+sufficient to drastically shift occupancy of helices: M:A and D:C
+are more occupied at the end of transcription than D:A and C:M.
 
 ### Tips and tricks
  - The header of the logfile contains all relevant DrTransformer parameters that generated the file. 
@@ -112,8 +116,12 @@ structures at the end of transcription.
  - Motifs for DrPlotter can also contain 'x' in the dot-bracket notation for *must be unpaired*.
 
 ## Version
+v0.12 -- perparing for official release
+  * changed --t-lin, --t-log defaults and fixed --t-lin=1, --t-log=1
+  * fixed potential issues with --t-end = --t-ext
+  * adapted README example to publication 
 
-v0.11 -- using lonley base-pairs
+v0.11 -- using lonely base-pairs
   * removed the --noLP default (added parameter setting)
   * added profiling option for runtime optimization
   * using --cg-auto default paramter
@@ -135,7 +143,7 @@ v0.9 -- standalone package (no official release)
 ## License
 The code of this project is available under MIT license, however this
 software depends on the [ViennaRNA] package which is available through the
-[ViennaRNA license], which is more restricted with respect to commertial use. 
+[ViennaRNA license], which is more restrictive with respect to commertial use. 
 
 ## Cite
 Badelt et al. (in preparation)
@@ -147,11 +155,12 @@ Badelt et al. (in preparation)
 [ViennaRNA license]: <https://github.com/ViennaRNA/ViennaRNA/blob/master/license.txt>
 [ribolands]: <https://github.com/bad-ants-fleet/ribolands>
 [treekin]: <https://github.com/ViennaRNA/Treekin>
+[DrForna]: <https://github.com/ViennaRNA/drforna>
 [Xayaphoummine et al. (2006)]: <https://doi.org/10.1093/nar/gkl1036>
 [`examples/`]: <examples>
 [`ABCD.fa`]: <examples/ABCD.fa>
 [`DCBA.fa`]: <examples/DCBA.fa>
-[`DCBAmod.fa`]: <examples/DCBAmod.fa>
+[`DCMA.fa`]: <examples/DCMA.fa>
 [`ABCD.motifs`]: <examples/ABCD.motifs>
 [`DCBA.motifs`]: <examples/DCBA.motifs>
-[`DCBAmod.motifs`]: <examples/DCBAmod.motifs>
+[`DCMA.motifs`]: <examples/DCMA.motifs>
