@@ -7,22 +7,36 @@ depends on the [ViennaRNA] package which is available through the [ViennaRNA
 license].
 
 ## Installation
-If you have a working version of the [ViennaRNA] package with Python bindings
-installed, then the latest stable release of DrTransformer can be installed
-from PyPI:
+If you already have the Python bindings of the [ViennaRNA] package installed,
+then the latest stable release of DrTransformer can be installed from PyPI:
 ```sh
   ~$ pip install drtransformer
 ```
 
-DrTransformer can also be installed with bioconda, which automatically resolves
-the [ViennaRNA package] dependencies. Use the following commands to get the
-latest version of the ViennaRNA package via conda.
-
+DrTransformer can also be installed with bioconda to resolve the [ViennaRNA]
+dependency automatically. First, make sure [bioconda] is set up properly with:
 ```sh
+  ~$ conda config --add channels defaults
   ~$ conda config --add channels bioconda
   ~$ conda config --add channels conda-forge
+  ~$ conda config --set channel_priority strict
+```
+Second, install or update your DrTransformer installation.
+```sh
   ~$ conda install drtransformer
 ```
+
+### Testing/Contributing
+To install the latest development version of DrTransformer, clone the
+repository and run:
+```sh
+  ~$ pip install .[dev]
+```
+Use the following command to run all present unittests:
+```sh
+  ~$ python -m pytest 
+```
+Please provide unittests if you are submitting a pull request with a new feature.
 
 ## Usage
 Until further documentation is available, please use the *--help* options of the 
@@ -136,23 +150,19 @@ v0.9 -- standalone package (no official release)
   * using scipy and numpy for matrix exponentials (instead of [treekin])
   * implemented lookahead to skip pruning of potentially relevant future structures
 
-## License
-The code of this project is available under MIT license, however this
-software depends on the [ViennaRNA] package which is available through the
-[ViennaRNA license], which is more restrictive with respect to commertial use. 
-
 ## Cite
-Badelt, Lorenz, Hofacker: "DrTransformer: Heuristic cotranscriptional RNA folding using the nearest neighbor energy model." (submitted)
- 
+Stefan Badelt, Ronny Lorenz, Ivo L Hofacker: **DrTransformer: heuristic
+cotranscriptional RNA folding using the nearest neighbor energy model**, 
+Bioinformatics, Volume 39, Issue 1, January 2023, 
+[https://doi.org/10.1093/bioinformatics/btad034]
+
 [//]: References
 [ViennaRNA]: <http://www.tbi.univie.ac.at/RNA>
-[ViennaRNA source]: <https://github.com/ViennaRNA/ViennaRNA>
-[ViennaRNA bioconda]: <https://anaconda.org/bioconda/viennarna>
 [ViennaRNA license]: <https://github.com/ViennaRNA/ViennaRNA/blob/master/license.txt>
-[ribolands]: <https://github.com/bad-ants-fleet/ribolands>
-[treekin]: <https://github.com/ViennaRNA/Treekin>
+[bioconda]: <https://bioconda.github.io>
 [DrForna]: <https://github.com/ViennaRNA/drforna>
 [Xayaphoummine et al. (2006)]: <https://doi.org/10.1093/nar/gkl1036>
+[https://doi.org/10.1093/bioinformatics/btad034]: <https://doi.org/10.1093/bioinformatics/btad034>
 [`examples/`]: <examples>
 [`ABCD.fa`]: <examples/ABCD.fa>
 [`DCBA.fa`]: <examples/DCBA.fa>
