@@ -31,9 +31,12 @@ dynamic = ["version"]
 [project.scripts]
 DrTransformer = "drtransformer.drtransformer:main"
 DrPlotter = "drtransformer.plotting:main"
-DrFindpath = "drtransformer.rnafolding:call_findpath_exe"
-DrCoarseGrain = "drtransformer.rnafolding:top_down_coarse_graining_exe"
-DrSimulate = "drtransformer.linalg:main"
+## The following scripts are not necessarily well maintained,
+## but certainly helpful if you want to coarse-grain, simulate,
+## or use the findpath function of DrTransformer.
+#DrFindpath = "drtransformer.rnafolding:call_findpath_exe"
+#DrCoarseGrain = "drtransformer.rnafolding:top_down_coarse_graining_exe"
+#DrSimulate = "drtransformer.linalg:main"
 
 [project.optional-dependencies]
 dev = [
