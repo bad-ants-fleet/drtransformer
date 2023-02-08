@@ -7,25 +7,36 @@ depends on the [ViennaRNA] package which is available through the [ViennaRNA
 license].
 
 ## Installation
+If you already have the Python bindings of the [ViennaRNA] package installed,
+then the latest stable release of DrTransformer can be installed from PyPI:
 ```sh
-  ~$ python setup.py install
-  ~$ python -m pytest tests/ -v -s
+  ~$ pip install drtransformer
 ```
 
-### ViennaRNA dependency
-This package uses the [ViennaRNA] library. Generally, every official release of
-DrTransformer should be compatible with the latest [ViennaRNA bioconda] version.
-For features available only on the development branches, you may have to install
-a more recent version from the [ViennaRNA source] on Github.
-
-Note that installing the latest version of the ViennaRNA package via conda 
-requires to use **both** the `bioconda` and the `conda-forge` channels.
-
+DrTransformer can also be installed with bioconda to resolve the [ViennaRNA]
+dependency automatically. First, make sure [bioconda] is set up properly with:
 ```sh
+  ~$ conda config --add channels defaults
   ~$ conda config --add channels bioconda
   ~$ conda config --add channels conda-forge
-  ~$ conda install viennarna
+  ~$ conda config --set channel_priority strict
 ```
+Second, install or update your DrTransformer installation.
+```sh
+  ~$ conda install drtransformer
+```
+
+### Testing/Contributing
+To install the latest development version of DrTransformer, clone the
+repository and run:
+```sh
+  ~$ pip install .[dev]
+```
+Use the following command to run all present unittests:
+```sh
+  ~$ python -m pytest 
+```
+Please provide unittests if you are submitting a pull request with a new feature.
 
 ## Usage
 Until further documentation is available, please use the *--help* options of the 
@@ -114,48 +125,19 @@ are more occupied at the end of transcription than D:A and C:M.
  - Use `--pause-sites` to see the effects of pausing at specific nucleotides on cotranscriptional folding.
  - Motifs for DrPlotter can also contain 'x' in the dot-bracket notation for *must be unpaired*.
 
-## Version
-v0.12 -- perparing for official release
-  * changed --t-lin, --t-log defaults and fixed --t-lin=1, --t-log=1
-  * fixed potential issues with --t-end = --t-ext
-  * adapted README example to publication 
-
-v0.11 -- using lonely base-pairs
-  * removed the --noLP default (added parameter setting)
-  * added profiling option for runtime optimization
-  * using --cg-auto default paramter
-  * using k0=1e5, t-ext=0.04 default parameter
-  * added new visulization types and fixed motif file input
-  * added epsilon to t-fast sanity check
-
-v0.10 -- moved to beta status (first official release)
-  * changes in parameter defaults 
-  * bugfix in linalg
-  * new DrPlotter simulation layout and motif plotting
-  * repaired code to enable plotting including pause sites
-
-v0.9 -- standalone package (no official release)
-  * extraction from the [ribolands] package to a standalone Python package.
-  * using scipy and numpy for matrix exponentials (instead of [treekin])
-  * implemented lookahead to skip pruning of potentially relevant future structures
-
-## License
-The code of this project is available under MIT license, however this
-software depends on the [ViennaRNA] package which is available through the
-[ViennaRNA license], which is more restrictive with respect to commertial use. 
-
 ## Cite
-Badelt, Lorenz, Hofacker: "DrTransformer: Heuristic cotranscriptional RNA folding using the nearest neighbor energy model." (submitted)
- 
+Stefan Badelt, Ronny Lorenz, Ivo L Hofacker: **DrTransformer: heuristic
+cotranscriptional RNA folding using the nearest neighbor energy model**, 
+Bioinformatics, Volume 39, Issue 1, January 2023, 
+[https://doi.org/10.1093/bioinformatics/btad034]
+
 [//]: References
 [ViennaRNA]: <http://www.tbi.univie.ac.at/RNA>
-[ViennaRNA source]: <https://github.com/ViennaRNA/ViennaRNA>
-[ViennaRNA bioconda]: <https://anaconda.org/bioconda/viennarna>
 [ViennaRNA license]: <https://github.com/ViennaRNA/ViennaRNA/blob/master/license.txt>
-[ribolands]: <https://github.com/bad-ants-fleet/ribolands>
-[treekin]: <https://github.com/ViennaRNA/Treekin>
+[bioconda]: <https://bioconda.github.io>
 [DrForna]: <https://github.com/ViennaRNA/drforna>
 [Xayaphoummine et al. (2006)]: <https://doi.org/10.1093/nar/gkl1036>
+[https://doi.org/10.1093/bioinformatics/btad034]: <https://doi.org/10.1093/bioinformatics/btad034>
 [`examples/`]: <examples>
 [`ABCD.fa`]: <examples/ABCD.fa>
 [`DCBA.fa`]: <examples/DCBA.fa>
