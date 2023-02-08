@@ -1,0 +1,45 @@
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "drtransformer"
+description = "Heuristic cotranscriptional folding using the nearest neighbor energy model."
+authors = [{name = "Stefan Badelt", email = "bad-ants-fleet@posteo.eu"}]
+readme = "README.md"
+keywords = ["cotranscriptional folding", "RNA", "secondary structure"]
+license = {file = "LICENSE"}
+classifiers = [
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "License :: OSI Approved :: MIT License",
+    "Development Status :: 5 - Production/Stable",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "packaging",
+    "numpy",
+    "scipy",
+    "matplotlib",
+]
+dynamic = ["version"]
+
+[project.scripts]
+DrTransformer = "drtransformer.drtransformer:main"
+DrPlotter = "drtransformer.plotting:main"
+DrFindpath = "drtransformer.rnafolding:call_findpath_exe"
+DrCoarseGrain = "drtransformer.rnafolding:top_down_coarse_graining_exe"
+DrSimulate = "drtransformer.linalg:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+]
+
+[project.urls]
+Home = "https://github.com/ViennaRNA/drtransformer"
+
