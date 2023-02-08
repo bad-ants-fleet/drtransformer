@@ -7,24 +7,21 @@ depends on the [ViennaRNA] package which is available through the [ViennaRNA
 license].
 
 ## Installation
+If you have a working version of the [ViennaRNA] package with Python bindings
+installed, then the latest stable release of DrTransformer can be installed
+from PyPI:
 ```sh
-  ~$ python setup.py install
-  ~$ python -m pytest tests/ -v -s
+  ~$ pip install drtransformer
 ```
 
-### ViennaRNA dependency
-This package uses the [ViennaRNA] library. Generally, every official release of
-DrTransformer should be compatible with the latest [ViennaRNA bioconda] version.
-For features available only on the development branches, you may have to install
-a more recent version from the [ViennaRNA source] on Github.
-
-Note that installing the latest version of the ViennaRNA package via conda 
-requires to use **both** the `bioconda` and the `conda-forge` channels.
+DrTransformer can also be installed with bioconda, which automatically resolves
+the [ViennaRNA package] dependencies. Use the following commands to get the
+latest version of the ViennaRNA package via conda.
 
 ```sh
   ~$ conda config --add channels bioconda
   ~$ conda config --add channels conda-forge
-  ~$ conda install viennarna
+  ~$ conda install drtransformer
 ```
 
 ## Usage
