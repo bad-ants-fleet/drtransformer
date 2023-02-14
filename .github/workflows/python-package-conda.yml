@@ -21,6 +21,8 @@ jobs:
     - name: Install conda dependencies
       run: |
         conda config --add channels bioconda
+        conda config --add channels conda-forge
+        conda config --set channel_priority strict
         conda install "viennarna>=2.5.1"
     - name: Install package 
       run: |
