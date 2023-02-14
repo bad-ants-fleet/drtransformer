@@ -3,7 +3,7 @@ name: Miniconda setup
 on: [push]
 
 jobs:
-  example:
+  trafo-tests:
     name: Ex1 (${{ matrix.python-version }}, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     defaults:
@@ -22,7 +22,8 @@ jobs:
           auto-update-conda: true
           activate-environment: trafo
           python-version: ${{ matrix.python-version }}
-          channels: defaults,bioconda,conda-forge
+          #channels: defaults,bioconda,conda-forge
+          channels: conda-forge,bioconda,defaults
           channel-priority: strict
       - name: Conda info
         run: |
