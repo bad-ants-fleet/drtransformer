@@ -18,17 +18,18 @@ jobs:
       run: |
         # $CONDA is an environment variable pointing to the root of the miniconda directory
         echo $CONDA/bin >> $GITHUB_PATH
-    - name: Install dependencies
+    - name: Install conda dependencies
       run: |
         #conda env update --file environment.yml --name base
-        conda update conda
-        conda config --add channels defaults
-        conda config --add channels bioconda
-        conda config --add channels conda-forge
-        conda config --set channel_priority strict
-        conda install viennarna
-        #python -m pip install --upgrade pip
-        #pip install flake8 pytest pytest-cov flit
+        #conda update conda
+        #conda config --add channels defaults
+        #conda config --add channels bioconda
+        #conda config --add channels conda-forge
+        #conda config --set channel_priority strict
+        conda install -c bioconda viennarna>=2.5.1
+    - name: Install package 
+      run: |
+        conda install flit
         python -m pip install .
     - name: Lint with flake8
       run: |
@@ -39,5 +40,5 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with pytest
       run: |
-        conda install pytest #pytest-cov
+        conda install pytest
         pytest
