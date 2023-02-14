@@ -12,26 +12,24 @@ jobs:
         os: ["ubuntu-latest", "macos-latest"]
         python-version: ["3.8", "3.9", "3.10"]
     steps:
+      - uses: actions/checkout@v3
       - uses: conda-incubator/setup-miniconda@v2
         with:
           auto-update-conda: true
-          python-version: ${{ matrix.python-version }}
           activate-environment: trafo
+          python-version: ${{ matrix.python-version }}
           channels: defaults,conda-forge,bioconda
           channel-priority: strict
-      - run: |
+      - name: Conda info
+        shell: bash -el {0}
+        run: |
           conda info
           conda list
           conda config --show-sources
           conda config --show
       - name: Conda test
-        run: |
-          conda install viennarna
-      - name: Conda info
         shell: bash -el {0}
-        run: conda info
-      - name: GetRepo
-        uses: actions/checkout@v3
-      - name: Conda list
-        shell: pwsh
-        run: conda list
+        run: |
+          conda activate trafo
+          conda install "viennarna>=2.5.1"
+
