@@ -7,17 +7,23 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       max-parallel: 5
-
     steps:
     - uses: actions/checkout@v3
-    - name: Set up Python 3.9
-      uses: actions/setup-python@v3
+      uses: conda-incubator/setup-miniconda@v2.2.0
       with:
-        python-version: '3.9'
+        auto-update-conda: true
+        python-version: 3.9
+        auto-activate-base: true
+        activate-environment: ""
+    - name: Conda info
+      shell: bash -el {0}
+      run: conda info
     - name: Add conda to system path
       run: |
+        echo $CONDA
         # $CONDA is an environment variable pointing to the root of the miniconda directory
         echo $CONDA/bin >> $GITHUB_PATH
+        echo $GITHUB_PATH
     - name: Install conda dependencies
       run: |
         conda config --add channels bioconda
