@@ -4,7 +4,7 @@ on: [push]
 
 jobs:
   trafo-tests:
-    name: Ex1 (${{ matrix.python-version }}, ${{ matrix.os }})
+    name: Env (${{ matrix.python-version }}, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -22,7 +22,7 @@ jobs:
           auto-update-conda: true
           activate-environment: trafo
           python-version: ${{ matrix.python-version }}
-          #channels: defaults,bioconda,conda-forge
+          # The order of channes is in reverse! *Very important*
           channels: conda-forge,bioconda,defaults
           channel-priority: strict
       - name: Conda info
