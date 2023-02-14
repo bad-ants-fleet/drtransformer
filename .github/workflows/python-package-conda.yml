@@ -21,10 +21,10 @@ jobs:
     - name: Install conda dependencies
       run: |
         conda config --add channels bioconda
-        conda install viennarna>=2.5.1
-        conda install flit
+        conda install "viennarna>=2.5.1"
     - name: Install package 
       run: |
+        conda install flit
         python -m pip install .
     - name: Lint with flake8
       run: |
