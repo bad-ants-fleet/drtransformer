@@ -20,10 +20,11 @@ jobs:
         echo $CONDA/bin >> $GITHUB_PATH
     - name: Install conda dependencies
       run: |
-        conda install -c bioconda viennarna>=2.5.1
+        conda config --add channels bioconda
+        conda install viennarna
+        conda install flit
     - name: Install package 
       run: |
-        conda install flit
         python -m pip install .
     - name: Lint with flake8
       run: |
