@@ -9,7 +9,7 @@ jobs:
       max-parallel: 5
     steps:
     - uses: actions/checkout@v3
-      uses: conda-incubator/setup-miniconda@v2.2.0
+    - uses: conda-incubator/setup-miniconda@v2.2.0
       with:
         auto-update-conda: true
         python-version: 3.9
