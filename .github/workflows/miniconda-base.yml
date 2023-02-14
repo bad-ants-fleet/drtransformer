@@ -17,11 +17,21 @@ jobs:
           auto-update-conda: true
           python-version: ${{ matrix.python-version }}
           activate-environment: trafo
-          channels: conda-forge,bioconda,defaults
+          channels: defaults,conda-forge,bioconda
           channel-priority: strict
+      - run: |
+          conda info
+          conda list
+          conda config --show-sources
+          conda config --show
+      - name: Conda test
+        run: |
+          conda install viennarna
       - name: Conda info
         shell: bash -el {0}
         run: conda info
+      - name: GetRepo
+        uses: actions/checkout@v3
       - name: Conda list
         shell: pwsh
         run: conda list
