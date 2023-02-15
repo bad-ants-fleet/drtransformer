@@ -202,7 +202,7 @@ def main():
     logger.addHandler(ch)
     logger.info(title)
 
-    (name, fullseq) = parse_vienna_stdin(sys.stdin, chars='ACGUNacgun')
+    (name, fullseq) = parse_vienna_stdin(sys.stdin, chars='ACGUNTacgunt')
 
     # Adjust arguments, prepare simulation
     if args.plot_minh:

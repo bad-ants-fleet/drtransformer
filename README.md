@@ -1,4 +1,8 @@
 # DrTransformer -- heuristic cotranscriptional folding.
+[![PyPI version](https://badge.fury.io/py/drtransformer.svg)](https://badge.fury.io/py/drtransformer)
+[![PyPI - License](https://img.shields.io/pypi/l/drtransformer)](https://opensource.org/licenses/MIT)
+![build](../../actions/workflows/ci-miniconda.yml/badge.svg)
+[![Codecov](https://img.shields.io/codecov/c/github/bad-ants-fleet/drtransformer)](https://codecov.io/gh/bad-ants-fleet/drtransformer)
 
 DrTransformer (short for "DNA-to-RNA transformer") is a program for heuristic
 and deterministic cotranscriptional folding simulations of RNA molecules. The
