@@ -32,7 +32,7 @@ from drtransformer.rnafolding import (# FrayingNeighborsTests
 
 SKIP = False
 
-@unittest.skipIf(SKIP, "slow tests are disabled by default")
+@unittest.skipIf(SKIP, "skipping tests")
 class FrayingNeighborsTests(unittest.TestCase):
     def setUp(self):
         self.md = RNA.md()
@@ -166,7 +166,7 @@ class GuideGraphTests(unittest.TestCase):
         assert len(edges) == 6
 
     def test_guiding_edge_search_02(self):
-        # NOTE: I did not actually check if this is correct.
+        # NOTE(SB): I did not actually check if this is correct.
         """
               AGACGACAAGGUUGAAUCGCACCCACAGUCUAUGAGUCGGUGACAACAUU
             1 ..........((((.((((.((.((.......)).))))))..))))...  -6.70    0  13.00
@@ -337,6 +337,7 @@ class GuideGraphTests(unittest.TestCase):
 
 @unittest.skipIf(SKIP, "skipping tests")
 class FindpathTests(unittest.TestCase):
+    # NOTE: The path returned by findpath is sometimes different on ubuntu and macos!
     def test_split_merge_01(self):
         seq = 'GCCUUAAGCCUACUUAGAUGGAAGUGACGUACGGGUAUU'
         ss1 = '(......((((((((......)))).......))))..)'
@@ -390,47 +391,25 @@ class FindpathTests(unittest.TestCase):
         #                ('((.........((((......)))).........)...)', 770),
         #                ('(((........((((......))))........))...)', 430),
         #                ('((((.......((((......)))).......)))...)', 280)]
-        #assert barrier == max((en for ss, en in path)) - path[0][1]
+        assert barrier == max((en for ss, en in path)) - path[0][1]
 
     def test_findpath_split_01(self):
         seq = 'AAAGCCGCCUUAAGCCUACUUAGAUGGAAGUGACGUACGGGUAUUGGUACACGAUUUUACAAAGCCGCCUUAAGCCUACUUAGAUGGAAGUGACGUACGGGUAUUGGUACACGAUUUUAC'
         ss1 = '...((((.(((..((.(((((......)))))..))..)))...))))...............((((.(((..((.(((((......)))))..))..)))...))))............'
         ss2 = '...(((((((.......((((......)))).......))))...)))...............(((((((.......((((......)))).......))))...)))............'
-       #ss2 = '....((((((.......((((......)))).......))))...)).................((((((.......((((......)))).......))))...)).............'
         vrna_md = RNA.md()
         #print(f'\n{seq}\n{ss1}\n{ss2}')
         path, barrier = findpath_split(seq, ss1, ss2, vrna_md, th = 99)
         assert barrier == 410
-        #assert path == [('...((((.(((..((.(((((......)))))..))..)))...))))...............((((.(((..((.(((((......)))))..))..)))...))))............', -1140),
-        #                ('...((((.(((..((.(((((......)))))..))..)))...))))...............((((.(((...(.(((((......)))))..)...)))...))))............', -860),
-        #                ('...((((.(((..((.(((((......)))))..))..)))...))))...............((((.(((.....(((((......)))))......)))...))))............', -970),
-        #                ('...((((.(((..((.(((((......)))))..))..)))...))))...............((((.((......(((((......))))).......))...))))............', -900),
-        #                ('...((((.(((..((.(((((......)))))..))..)))...))))...............((((.(.......(((((......)))))........)...))))............', -750),
-        #                ('...((((.(((..((.(((((......)))))..))..)))...))))...............((((.........(((((......)))))............))))............', -820),
-        #                ('...((((.(((..((.(((((......)))))..))..)))...))))...............(((((........(((((......)))))........)...))))............', -730),
-        #                ('...((((.(((..((.(((((......)))))..))..)))...))))...............((((((.......(((((......))))).......))...))))............', -1070),
-        #                ('...((((.(((..((.(((((......)))))..))..)))...))))...............(((.((.......(((((......))))).......))....)))............', -920),
-        #                ('...((((.(((..((.(((((......)))))..))..)))...))))...............((((((.......(((((......))))).......)))...)))............', -1180),
-        #                ('...((((.(((..((.(((((......)))))..))..)))...))))...............(((((((......(((((......)))))......))))...)))............', -1340),
-        #                ('...((((.(((...(.(((((......)))))..)...)))...))))...............(((((((......(((((......)))))......))))...)))............', -1060), 
-        #                ('...((((.(((.....(((((......)))))......)))...))))...............(((((((......(((((......)))))......))))...)))............', -1170),
-        #                ('...((((.((......(((((......))))).......))...))))...............(((((((......(((((......)))))......))))...)))............', -1100),
-        #                ('...((((.(.......(((((......)))))........)...))))...............(((((((......(((((......)))))......))))...)))............', -950),
-        #                ('...((((.........(((((......)))))............))))...............(((((((......(((((......)))))......))))...)))............', -1020),
-        #                ('...(((((........(((((......)))))........)...))))...............(((((((......(((((......)))))......))))...)))............', -930),
-        #                ('...((((((.......(((((......))))).......))...))))...............(((((((......(((((......)))))......))))...)))............', -1270),
-        #                ('...(((.((.......(((((......))))).......))....)))...............(((((((......(((((......)))))......))))...)))............', -1120),
-        #                ('...((((((.......(((((......))))).......)))...)))...............(((((((......(((((......)))))......))))...)))............', -1380),
-        #                ('...(((((((......(((((......)))))......))))...)))...............(((((((......(((((......)))))......))))...)))............', -1540),
-        #                ('...(((((((.......((((......)))).......))))...)))...............(((((((......(((((......)))))......))))...)))............', -1420),
-        #                ('...(((((((.......((((......)))).......))))...)))...............(((((((.......((((......)))).......))))...)))............', -1300)]
-        #assert barrier == max((en for ss, en in path)) - path[0][1]
+        assert barrier == max((en for ss, en in path)) - path[0][1]
         #for (ss, en) in path:
         #    print(f'{ss} {en:>5d}')
+
         path, barrier = findpath_split(seq, ss1, ss2, vrna_md, th = 5)
         assert barrier == 410
         #for (ss, en) in path:
         #    print(f'{ss} {en:>5d}')
+
         path, barrier = findpath_split(seq, ss1, ss2, vrna_md, th = 1)
         assert barrier == 410
         #for (ss, en) in path:
@@ -578,22 +557,13 @@ class TopDownCoarseGrainTests(unittest.TestCase):
         gnodes, gedges = get_guide_graph(seq, md, ndata.keys())
         assert len(gnodes) == 25
         assert len(gedges) == 240
-
         for nid, (ss, en) in enumerate(gnodes, 40):
             ndata[ss] = {'energy': en, 'identity': 40}
 
+        # NOTE: Results differ between ubuntu and macos due to findpath results!
         ndata, edata = neighborhood_flooding((seq, md, fpwm), ndata, gedges, minh = myminh)
-        # TODO: This differes between linux and mac-os! Presumably because of 
-        # findpath results?
-        #assert len(ndata) == 80
-        #assert len(edata) == 316
-
         cgn, cge, cgm = top_down_coarse_graining(ndata, edata, minh = myminh)
-        assert len(cgn) == 20
-        assert len(cge) == 84
-        assert len(cgm) == 20
         assert len(set([x for val in cgm.values() for x in val])) == len(ndata) - len(cgn)
-
         #from drtransformer.rnafolding import as_barfile
         #print('\n' + as_barfile(seq, cgn, cge, cgm))
 
