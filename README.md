@@ -1,9 +1,9 @@
 # DrTransformer -- heuristic cotranscriptional folding.
-[![GitHub tag (latest by date)](https://img.shields.io/github/v/tag/ViennaRNA/drtransformer)](https://github.com/ViennaRNA/drtransformer/tags)
-[![GitHub release (latest by date including pre-releases)](https://img.shields.io/github/v/release/ViennaRNA/drtransformer?include_prereleases)](https://github.com/ViennaRNA/drtransformer/releases)
+[![GitHub tag (latest by date)](https://img.shields.io/github/v/tag/bad-ants-fleet/drtransformer)](https://github.com/bad-ants-fleet/drtransformer/tags)
+[![GitHub release (latest by date including pre-releases)](https://img.shields.io/github/v/release/bad-ants-fleet/drtransformer?include_prereleases)](https://github.com/bad-ants-fleet/drtransformer/releases)
 [![PyPI version](https://badge.fury.io/py/drtransformer.svg)](https://badge.fury.io/py/drtransformer)
 [![PyPI - License](https://img.shields.io/pypi/l/drtransformer)](https://opensource.org/licenses/MIT)
-![build](actions/workflows/ci-miniconda.yml/badge.svg)
+![build](../../actions/workflows/ci-miniconda.yml/badge.svg)
 [![Codecov](https://img.shields.io/codecov/c/github/bad-ants-fleet/drtransformer)](https://codecov.io/gh/bad-ants-fleet/drtransformer)
 
 DrTransformer (short for "DNA-to-RNA transformer") is a program for heuristic
