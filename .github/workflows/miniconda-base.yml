@@ -34,7 +34,7 @@ jobs:
           conda install "viennarna>=2.5.1"
       - name: Install devtools
         run: |
-          conda install flake8, pytest, pytest-cov
+          conda install flake8 pytest pytest-cov
       - name: Install package 
         run: |
           python -m pip install .
