@@ -23,10 +23,11 @@ jobs:
           auto-update-conda: true
           python-version: ${{ matrix.python-version }}
           # The order of channes is in reverse! *Very important*
-          channels: conda-forge,bioconda,defaults
+          channels: conda-forge,bioconda
           channel-priority: strict
       - name: Conda info
         run: |
+          conda config --set channel_priority strict
           conda info
           conda list
       - name: Install viennarna
